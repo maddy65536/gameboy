@@ -178,6 +178,15 @@ impl Cpu {
     }
 
     pub fn execute_instruction(&mut self) -> usize {
-        todo!("implement this lol")
+        let opcode = self.fetch_u8();
+
+        match opcode {
+            0x00 => 4,
+            _ => unimplemented!(
+                "unimplemented opcode {:#04X} at pc {:#06X}",
+                opcode,
+                self.rf.pc - 1
+            ),
+        }
     }
 }
