@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 
 #[derive(Debug)]
-pub struct Interconnect {
+pub struct Bus {
     pub ram: [u8; 0xFFFF],
     pub touched: HashSet<u16>, // just a flat array until i start the memory map stuff
 }
 
-impl Interconnect {
+impl Bus {
     pub fn new() -> Self {
-        Interconnect {
+        Bus {
             ram: [0; 0xFFFF],
             touched: HashSet::new(),
         }

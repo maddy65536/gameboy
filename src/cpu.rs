@@ -1,11 +1,11 @@
 use serde::Deserialize;
 
-use crate::interconnect::Interconnect;
+use crate::bus::Bus;
 
 #[derive(Debug)]
 pub struct Cpu {
     rf: RegisterFile,
-    ic: Interconnect,
+    bus: Bus,
     ime: bool,
 }
 
@@ -114,14 +114,14 @@ impl Cpu {
     pub fn new() -> Self {
         Self {
             rf: RegisterFile::default(),
-            ic: Interconnect::new(),
+            bus: Bus::new(),
             ime: false,
         }
     }
 
     pub fn from_state(state: &State) -> Self {
         let mut rf = RegisterFile::default();
-        let mut ic = Interconnect::new();
+        let mut bus = Bus::new();
 
         rf.a = state.a;
         rf.f = state.f;
@@ -135,10 +135,14 @@ impl Cpu {
         rf.pc = state.pc;
 
         for (addr, val) in state.ram.iter().cloned() {
-            ic.write_u8(addr, val);
+            bus.write_u8(addr, val);
         }
 
-        Self { rf, ic, ime: false }
+        Self {
+            rf,
+            bus,
+            ime: false,
+        }
     }
 
     pub fn to_state(&self) -> State {
@@ -154,25 +158,25 @@ impl Cpu {
             sp: self.rf.sp,
             pc: self.rf.pc,
             ram: self
-                .ic
+                .bus
                 .ram
                 .iter()
                 .cloned()
                 .enumerate()
                 .map(|x| (x.0 as u16, x.1))
-                .filter(|x| self.ic.touched.contains(&x.0))
+                .filter(|x| self.bus.touched.contains(&x.0))
                 .collect(),
         }
     }
 
     pub fn fetch_u8(&mut self) -> u8 {
-        let res = self.ic.read_u8(self.rf.pc);
+        let res = self.bus.read_u8(self.rf.pc);
         self.rf.pc += 1;
         res
     }
 
     pub fn fetch_u16(&mut self) -> u16 {
-        let res = self.ic.read_u16(self.rf.pc);
+        let res = self.bus.read_u16(self.rf.pc);
         self.rf.pc += 2;
         res
     }
