@@ -7,16 +7,18 @@ use std::fs;
 mod bus;
 mod cpu;
 
+const TEST_PATH: &str = "../sm83/v1/";
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         panic!(":(");
     }
 
-    run_tests(&args[1]);
+    run_tests(&(TEST_PATH.to_owned() + &args[1]));
 }
 
-fn run_tests(path: &str) {
+fn run_tests(path: &str) -> bool {
     let mut failed = false;
     let data = fs::read_to_string(path).unwrap();
     let tests: Vec<Test> = serde_json::from_str(&data).unwrap();
@@ -38,6 +40,7 @@ fn run_tests(path: &str) {
     if !failed {
         println!("all tests passed! yay!");
     }
+    failed
 }
 
 #[derive(Debug, Deserialize)]
