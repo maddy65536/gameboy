@@ -14,6 +14,13 @@ impl Bus {
         }
     }
 
+    pub fn reset(&mut self) {
+        for addr in self.touched.iter() {
+            self.ram[*addr as usize] = 0;
+        }
+        self.touched.clear();
+    }
+
     pub fn read_u8(&self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }

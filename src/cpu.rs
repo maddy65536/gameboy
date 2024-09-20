@@ -104,6 +104,26 @@ pub struct State {
     pub ram: Vec<(u16, u8)>,
 }
 
+enum Reg8 {
+    A,
+    F,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+}
+
+enum Reg16 {
+    Af,
+    Bc,
+    De,
+    Hl,
+    Sp,
+    Pc,
+}
+
 impl RegisterFile {
     // r/w 16-bit registers
     pub fn write_af(&mut self, val: u16) {
@@ -174,6 +194,32 @@ impl RegisterFile {
     pub fn read_c(&self) -> bool {
         ((self.f & (1 << 4)) >> 4) == 1
     }
+
+    fn write_reg8(&mut self, reg: Reg8, val: u8) {
+        match reg {
+            Reg8::A => self.a = val,
+            Reg8::F => self.f = val,
+            Reg8::B => self.b = val,
+            Reg8::C => self.c = val,
+            Reg8::D => self.d = val,
+            Reg8::E => self.e = val,
+            Reg8::H => self.h = val,
+            Reg8::L => self.l = val,
+        }
+    }
+
+    fn read_reg8(&mut self, reg: Reg8) -> u8 {
+        match reg {
+            Reg8::A => self.a,
+            Reg8::F => self.f,
+            Reg8::B => self.b,
+            Reg8::C => self.c,
+            Reg8::D => self.d,
+            Reg8::E => self.e,
+            Reg8::H => self.f,
+            Reg8::L => self.l,
+        }
+    }
 }
 
 impl Cpu {
@@ -208,6 +254,37 @@ impl Cpu {
             rf,
             bus,
             ime: false,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.rf.a = 0;
+        self.rf.f = 0;
+        self.rf.b = 0;
+        self.rf.c = 0;
+        self.rf.d = 0;
+        self.rf.e = 0;
+        self.rf.h = 0;
+        self.rf.l = 0;
+        self.rf.sp = 0;
+        self.rf.pc = 0;
+        self.bus.reset();
+    }
+
+    pub fn set_state(&mut self, state: &State) {
+        self.rf.a = state.a;
+        self.rf.f = state.f;
+        self.rf.b = state.b;
+        self.rf.c = state.c;
+        self.rf.d = state.d;
+        self.rf.e = state.e;
+        self.rf.h = state.h;
+        self.rf.l = state.l;
+        self.rf.sp = state.sp;
+        self.rf.pc = state.pc;
+
+        for (addr, val) in state.ram.iter().cloned() {
+            self.bus.write_u8(addr, val);
         }
     }
 
@@ -253,6 +330,11 @@ impl Cpu {
         match opcode {
             0x00 => (), // NOP
             0x01 | 0x11 | 0x21 | 0x31 => self.ld_r16_imm(opcode),
+            0x02 | 0x12 | 0x22 | 0x32 | 0x0A | 0x1A | 0x2A | 0x3A => self.ld_r16ind_a(opcode),
+            0x03 | 0x13 | 0x23 | 0x33 => self.inc16(opcode),
+            0x04 | 0x14 | 0x24 | 0x34 | 0x0C | 0x1C | 0x2C | 0x3C => self.inc8(opcode),
+            0x0B | 0x1B | 0x2B | 0x3B => self.dec16(opcode),
+            0x05 | 0x15 | 0x25 | 0x35 | 0x0D | 0x1D | 0x2D | 0x3D => self.dec8(opcode),
             _ => unimplemented!(
                 "unimplemented opcode {:#04X} at pc {:#06X}",
                 opcode,
@@ -263,6 +345,7 @@ impl Cpu {
         INSTRUCTION_TIMINGS[opcode as usize]
     }
 
+    // load a 16 bit register from an immediate
     fn ld_r16_imm(&mut self, opcode: u8) {
         let imm = self.fetch_u16();
         match opcode {
@@ -271,6 +354,103 @@ impl Cpu {
             0x21 => self.rf.write_hl(imm),
             0x31 => self.rf.sp = imm,
             _ => panic!("called ld_imm_16 with unsupported opcode {:#04X}", opcode),
+        }
+    }
+
+    // load or store from accumulator at an address in a 16 bit register
+    fn ld_r16ind_a(&mut self, opcode: u8) {
+        match opcode {
+            0x02 => self.bus.write_u8(self.rf.read_bc(), self.rf.a),
+            0x12 => self.bus.write_u8(self.rf.read_de(), self.rf.a),
+            0x22 => {
+                self.bus.write_u8(self.rf.read_hl(), self.rf.a);
+                self.rf.write_hl(self.rf.read_hl() + 1);
+            }
+            0x32 => {
+                self.bus.write_u8(self.rf.read_hl(), self.rf.a);
+                self.rf.write_hl(self.rf.read_hl() - 1);
+            }
+            0x0A => self.rf.a = self.bus.read_u8(self.rf.read_bc()),
+            0x1A => self.rf.a = self.bus.read_u8(self.rf.read_de()),
+            0x2A => {
+                self.rf.a = self.bus.read_u8(self.rf.read_hl());
+                self.rf.write_hl(self.rf.read_hl() + 1);
+            }
+            0x3A => {
+                self.rf.a = self.bus.read_u8(self.rf.read_hl());
+                self.rf.write_hl(self.rf.read_hl() - 1);
+            }
+            _ => panic!("called ld_r16ind_a with unsupported opcode {:#04X}", opcode),
+        }
+    }
+
+    fn inc16(&mut self, opcode: u8) {
+        match opcode {
+            0x03 => self.rf.write_bc(self.rf.read_bc().wrapping_add(1)),
+            0x13 => self.rf.write_de(self.rf.read_de().wrapping_add(1)),
+            0x23 => self.rf.write_hl(self.rf.read_hl().wrapping_add(1)),
+            0x33 => self.rf.sp = self.rf.sp.wrapping_add(1),
+            _ => panic!("called inc16 with unsupported opcode {:#04X}", opcode),
+        }
+    }
+
+    fn inc(&mut self, val: u8) -> u8 {
+        let res = val.wrapping_add(1);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h((val & 0xF) + 1 > 0xF);
+        res
+    }
+
+    fn inc8(&mut self, opcode: u8) {
+        match opcode {
+            0x04 => self.rf.b = self.inc(self.rf.b),
+            0x14 => self.rf.d = self.inc(self.rf.d),
+            0x24 => self.rf.h = self.inc(self.rf.h),
+            0x34 => {
+                let val = self.inc(self.bus.read_u8(self.rf.read_hl()));
+                self.bus.write_u8(self.rf.read_hl(), val);
+            }
+            0x0C => self.rf.c = self.inc(self.rf.c),
+            0x1C => self.rf.e = self.inc(self.rf.e),
+            0x2C => self.rf.l = self.inc(self.rf.l),
+            0x3C => self.rf.a = self.inc(self.rf.a),
+            _ => panic!("called inc8 with unsupported opcode {:#04X}", opcode),
+        }
+    }
+
+    fn dec16(&mut self, opcode: u8) {
+        match opcode {
+            0x0B => self.rf.write_bc(self.rf.read_bc().wrapping_sub(1)),
+            0x1B => self.rf.write_de(self.rf.read_de().wrapping_sub(1)),
+            0x2B => self.rf.write_hl(self.rf.read_hl().wrapping_sub(1)),
+            0x3B => self.rf.sp = self.rf.sp.wrapping_sub(1),
+            _ => panic!("called dec16 with unsupported opcode {:#04X}", opcode),
+        }
+    }
+
+    fn dec(&mut self, val: u8) -> u8 {
+        let res = val.wrapping_sub(1);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(true);
+        self.rf.write_h((val & 0xF) == 0x0);
+        res
+    }
+
+    fn dec8(&mut self, opcode: u8) {
+        match opcode {
+            0x05 => self.rf.b = self.dec(self.rf.b),
+            0x15 => self.rf.d = self.dec(self.rf.d),
+            0x25 => self.rf.h = self.dec(self.rf.h),
+            0x35 => {
+                let val = self.dec(self.bus.read_u8(self.rf.read_hl()));
+                self.bus.write_u8(self.rf.read_hl(), val);
+            }
+            0x0D => self.rf.c = self.dec(self.rf.c),
+            0x1D => self.rf.e = self.dec(self.rf.e),
+            0x2D => self.rf.l = self.dec(self.rf.l),
+            0x3D => self.rf.a = self.dec(self.rf.a),
+            _ => panic!("called dec8 with unsupported opcode {:#04X}", opcode),
         }
     }
 }

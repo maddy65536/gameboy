@@ -15,7 +15,15 @@ fn main() {
         panic!(":(");
     }
 
-    run_tests(&(TEST_PATH.to_owned() + &args[1]));
+    if args[1] == "all" {
+        for file in fs::read_dir("../sm83/v1/").unwrap() {
+            run_tests(file.unwrap().path().to_str().unwrap());
+        }
+    } else {
+        for arg in args.iter().skip(1) {
+            run_tests(&(TEST_PATH.to_owned() + arg));
+        }
+    }
 }
 
 fn run_tests(path: &str) -> bool {
@@ -24,9 +32,11 @@ fn run_tests(path: &str) -> bool {
     let tests: Vec<Test> = serde_json::from_str(&data).unwrap();
     println!("running test: {}", path);
 
+    let mut cpu = Cpu::new();
+
     for test in tests {
+        cpu.set_state(&test.initial);
         // println!("test name: {}", test.name);
-        let mut cpu = Cpu::from_state(&test.initial);
         cpu.execute_instruction();
         let final_state = cpu.to_state();
         if test.end != final_state {
@@ -38,6 +48,7 @@ fn run_tests(path: &str) -> bool {
             );
             println!("----------------------------------------------------------------");
         }
+        cpu.reset();
     }
 
     if !failed {
