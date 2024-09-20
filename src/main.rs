@@ -25,15 +25,18 @@ fn run_tests(path: &str) -> bool {
     println!("running test: {}", path);
 
     for test in tests {
+        // println!("test name: {}", test.name);
         let mut cpu = Cpu::from_state(&test.initial);
         cpu.execute_instruction();
         let final_state = cpu.to_state();
         if test.end != final_state {
             failed = true;
+            println!("----------------------------------------------------------------");
             println!(
                 "test name: {}\ninitial: {:#?}\nexpected: {:#?}\nactual: {:#?}",
                 test.name, test.initial, test.end, final_state
             );
+            println!("----------------------------------------------------------------");
         }
     }
 

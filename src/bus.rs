@@ -2,14 +2,14 @@ use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Bus {
-    pub ram: [u8; 0xFFFF],
-    pub touched: HashSet<u16>, // just a flat array until i start the memory map stuff
+    pub ram: [u8; 0x10000], // just a flat array until i start the memory map stuff
+    pub touched: HashSet<u16>,
 }
 
 impl Bus {
     pub fn new() -> Self {
         Bus {
-            ram: [0; 0xFFFF],
+            ram: [0; 0x10000],
             touched: HashSet::new(),
         }
     }
