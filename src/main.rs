@@ -16,8 +16,12 @@ fn main() {
     }
 
     if args[1] == "all" {
+        let mut failed = false;
         for file in fs::read_dir("../sm83/v1/").unwrap() {
-            run_tests(file.unwrap().path().to_str().unwrap());
+            failed = failed || run_tests(file.unwrap().path().to_str().unwrap());
+        }
+        if !failed {
+            println!("all tests passed! wow!")
         }
     } else {
         for arg in args.iter().skip(1) {

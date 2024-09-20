@@ -68,6 +68,8 @@ const CB_INSTRUCTION_TIMINGS: [usize; 256] = [
     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8,  16, 8,  // 0xF0
 ];
 
+const HL_IND_REG_NUM: u8 = 0x6;
+
 #[derive(Debug)]
 pub struct Cpu {
     rf: RegisterFile,
@@ -102,26 +104,6 @@ pub struct State {
     pub sp: u16,
     pub pc: u16,
     pub ram: Vec<(u16, u8)>,
-}
-
-enum Reg8 {
-    A,
-    F,
-    B,
-    C,
-    D,
-    E,
-    H,
-    L,
-}
-
-enum Reg16 {
-    Af,
-    Bc,
-    De,
-    Hl,
-    Sp,
-    Pc,
 }
 
 impl RegisterFile {
@@ -194,30 +176,35 @@ impl RegisterFile {
     pub fn read_c(&self) -> bool {
         ((self.f & (1 << 4)) >> 4) == 1
     }
+}
 
-    fn write_reg8(&mut self, reg: Reg8, val: u8) {
-        match reg {
-            Reg8::A => self.a = val,
-            Reg8::F => self.f = val,
-            Reg8::B => self.b = val,
-            Reg8::C => self.c = val,
-            Reg8::D => self.d = val,
-            Reg8::E => self.e = val,
-            Reg8::H => self.h = val,
-            Reg8::L => self.l = val,
+impl std::ops::Index<u8> for RegisterFile {
+    type Output = u8;
+    fn index(&self, index: u8) -> &Self::Output {
+        match index {
+            0 => &self.b,
+            1 => &self.c,
+            2 => &self.d,
+            3 => &self.e,
+            4 => &self.h,
+            5 => &self.l,
+            7 => &self.a,
+            _ => panic!("cannot convert {} to a register!", index),
         }
     }
+}
 
-    fn read_reg8(&mut self, reg: Reg8) -> u8 {
-        match reg {
-            Reg8::A => self.a,
-            Reg8::F => self.f,
-            Reg8::B => self.b,
-            Reg8::C => self.c,
-            Reg8::D => self.d,
-            Reg8::E => self.e,
-            Reg8::H => self.f,
-            Reg8::L => self.l,
+impl std::ops::IndexMut<u8> for RegisterFile {
+    fn index_mut(&mut self, index: u8) -> &mut Self::Output {
+        match index {
+            0 => &mut self.b,
+            1 => &mut self.c,
+            2 => &mut self.d,
+            3 => &mut self.e,
+            4 => &mut self.h,
+            5 => &mut self.l,
+            7 => &mut self.a,
+            _ => panic!("cannot convert {} to a register!", index),
         }
     }
 }
@@ -324,13 +311,26 @@ impl Cpu {
         res
     }
 
+    fn read_hl_ind(&self) -> u8 {
+        self.bus.read_u8(self.rf.read_hl())
+    }
+
+    fn write_hl_ind(&mut self, val: u8) {
+        self.bus.write_u8(self.rf.read_hl(), val);
+    }
+
     pub fn execute_instruction(&mut self) -> usize {
         let opcode = self.fetch_u8();
 
         match opcode {
+            0xCB => return self.cb_execute_instruction(),
             0x00 => (), // NOP
+            // loads
             0x01 | 0x11 | 0x21 | 0x31 => self.ld_r16_imm(opcode),
-            0x02 | 0x12 | 0x22 | 0x32 | 0x0A | 0x1A | 0x2A | 0x3A => self.ld_r16ind_a(opcode),
+            0x06 | 0x16 | 0x26 | 0x36 | 0x0E | 0x1E | 0x2E | 0x3E => self.ld_r8_imm(opcode),
+            0x02 | 0x12 | 0x22 | 0x32 | 0x0A | 0x1A | 0x2A | 0x3A => self.ld_ind_a(opcode),
+            0x40..=0x75 | 0x77..=0x7F => self.ld_r8(opcode),
+            // math
             0x03 | 0x13 | 0x23 | 0x33 => self.inc16(opcode),
             0x04 | 0x14 | 0x24 | 0x34 | 0x0C | 0x1C | 0x2C | 0x3C => self.inc8(opcode),
             0x0B | 0x1B | 0x2B | 0x3B => self.dec16(opcode),
@@ -345,6 +345,18 @@ impl Cpu {
         INSTRUCTION_TIMINGS[opcode as usize]
     }
 
+    fn cb_execute_instruction(&mut self) -> usize {
+        let opcode = self.fetch_u8();
+
+        unimplemented!(
+            "unimplemented CB opcode {:#04X} at pc {:#06X}",
+            opcode,
+            self.rf.pc - 1
+        );
+
+        CB_INSTRUCTION_TIMINGS[opcode as usize]
+    }
+
     // load a 16 bit register from an immediate
     fn ld_r16_imm(&mut self, opcode: u8) {
         let imm = self.fetch_u16();
@@ -357,30 +369,52 @@ impl Cpu {
         }
     }
 
+    fn ld_r8_imm(&mut self, opcode: u8) {
+        let imm = self.fetch_u8();
+        let reg = (opcode >> 3) & 7;
+        if reg == HL_IND_REG_NUM {
+            self.write_hl_ind(imm);
+        } else {
+            self.rf[reg] = imm;
+        }
+    }
+
     // load or store from accumulator at an address in a 16 bit register
-    fn ld_r16ind_a(&mut self, opcode: u8) {
+    fn ld_ind_a(&mut self, opcode: u8) {
         match opcode {
             0x02 => self.bus.write_u8(self.rf.read_bc(), self.rf.a),
             0x12 => self.bus.write_u8(self.rf.read_de(), self.rf.a),
             0x22 => {
-                self.bus.write_u8(self.rf.read_hl(), self.rf.a);
+                self.write_hl_ind(self.rf.a);
                 self.rf.write_hl(self.rf.read_hl() + 1);
             }
             0x32 => {
-                self.bus.write_u8(self.rf.read_hl(), self.rf.a);
+                self.write_hl_ind(self.rf.a);
                 self.rf.write_hl(self.rf.read_hl() - 1);
             }
             0x0A => self.rf.a = self.bus.read_u8(self.rf.read_bc()),
             0x1A => self.rf.a = self.bus.read_u8(self.rf.read_de()),
             0x2A => {
-                self.rf.a = self.bus.read_u8(self.rf.read_hl());
+                self.rf.a = self.read_hl_ind();
                 self.rf.write_hl(self.rf.read_hl() + 1);
             }
             0x3A => {
-                self.rf.a = self.bus.read_u8(self.rf.read_hl());
+                self.rf.a = self.read_hl_ind();
                 self.rf.write_hl(self.rf.read_hl() - 1);
             }
             _ => panic!("called ld_r16ind_a with unsupported opcode {:#04X}", opcode),
+        }
+    }
+
+    fn ld_r8(&mut self, opcode: u8) {
+        let src = opcode & 7;
+        let dest = (opcode >> 3) & 7;
+        if src == HL_IND_REG_NUM {
+            self.rf[dest] = self.read_hl_ind()
+        } else if dest == HL_IND_REG_NUM {
+            self.write_hl_ind(self.rf[src]);
+        } else {
+            self.rf[dest] = self.rf[src];
         }
     }
 
@@ -403,19 +437,12 @@ impl Cpu {
     }
 
     fn inc8(&mut self, opcode: u8) {
-        match opcode {
-            0x04 => self.rf.b = self.inc(self.rf.b),
-            0x14 => self.rf.d = self.inc(self.rf.d),
-            0x24 => self.rf.h = self.inc(self.rf.h),
-            0x34 => {
-                let val = self.inc(self.bus.read_u8(self.rf.read_hl()));
-                self.bus.write_u8(self.rf.read_hl(), val);
-            }
-            0x0C => self.rf.c = self.inc(self.rf.c),
-            0x1C => self.rf.e = self.inc(self.rf.e),
-            0x2C => self.rf.l = self.inc(self.rf.l),
-            0x3C => self.rf.a = self.inc(self.rf.a),
-            _ => panic!("called inc8 with unsupported opcode {:#04X}", opcode),
+        let reg = (opcode >> 3) & 7;
+        if reg == HL_IND_REG_NUM {
+            let res = self.inc(self.read_hl_ind());
+            self.write_hl_ind(res);
+        } else {
+            self.rf[reg] = self.inc(self.rf[reg]);
         }
     }
 
@@ -438,19 +465,12 @@ impl Cpu {
     }
 
     fn dec8(&mut self, opcode: u8) {
-        match opcode {
-            0x05 => self.rf.b = self.dec(self.rf.b),
-            0x15 => self.rf.d = self.dec(self.rf.d),
-            0x25 => self.rf.h = self.dec(self.rf.h),
-            0x35 => {
-                let val = self.dec(self.bus.read_u8(self.rf.read_hl()));
-                self.bus.write_u8(self.rf.read_hl(), val);
-            }
-            0x0D => self.rf.c = self.dec(self.rf.c),
-            0x1D => self.rf.e = self.dec(self.rf.e),
-            0x2D => self.rf.l = self.dec(self.rf.l),
-            0x3D => self.rf.a = self.dec(self.rf.a),
-            _ => panic!("called dec8 with unsupported opcode {:#04X}", opcode),
+        let reg = (opcode >> 3) & 7;
+        if reg == HL_IND_REG_NUM {
+            let res = self.dec(self.read_hl_ind());
+            self.write_hl_ind(res);
+        } else {
+            self.rf[reg] = self.dec(self.rf[reg]);
         }
     }
 }
