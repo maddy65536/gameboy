@@ -344,11 +344,26 @@ impl Cpu {
             0x06 | 0x16 | 0x26 | 0x36 | 0x0E | 0x1E | 0x2E | 0x3E => self.ld_r8_imm(opcode),
             0x02 | 0x12 | 0x22 | 0x32 | 0x0A | 0x1A | 0x2A | 0x3A => self.ld_ind_a(opcode),
             0x40..=0x75 | 0x77..=0x7F => self.ld_r8(opcode),
+            0x08 => self.ld_ind_imm_sp(),
+            0xF9 => self.ld_sp(),
             // math
+            0x07 => self.rlca(),
+            0x17 => self.rla(),
+            0x0F => self.rrca(),
+            0x1F => self.rra(),
             0x03 | 0x13 | 0x23 | 0x33 => self.inc16(opcode),
             0x04 | 0x14 | 0x24 | 0x34 | 0x0C | 0x1C | 0x2C | 0x3C => self.inc8(opcode),
             0x0B | 0x1B | 0x2B | 0x3B => self.dec16(opcode),
             0x05 | 0x15 | 0x25 | 0x35 | 0x0D | 0x1D | 0x2D | 0x3D => self.dec8(opcode),
+            0x09 | 0x19 | 0x29 | 0x39 => self.add16(opcode),
+            0x80..=0x87 | 0xC6 => self.add(opcode),
+            0x88..=0x8F | 0xCE => self.adc(opcode),
+            0x90..=0x97 | 0xD6 => self.sub(opcode),
+            0x98..=0x9F | 0xDE => self.sbc(opcode),
+            0xA0..=0xA7 | 0xE6 => self.and(opcode),
+            0xA8..=0xAF | 0xEE => self.xor(opcode),
+            0xB0..=0xB7 | 0xF6 => self.or(opcode),
+            0xB8..=0xBF | 0xFE => self.cp(opcode),
             _ => unimplemented!(
                 "unimplemented opcode {:#04X} at pc {:#06X}",
                 opcode,
@@ -437,6 +452,55 @@ impl Cpu {
         self.write_r8(dest, self.read_r8(src));
     }
 
+    fn ld_ind_imm_sp(&mut self) {
+        let addr = self.fetch_u16();
+        self.bus.write_u16(addr, self.rf.sp);
+    }
+
+    fn ld_sp(&mut self) {
+        self.rf.sp = self.rf.read_hl();
+    }
+
+    fn rlca(&mut self) {
+        let val = self.rf.a;
+        let res = val.rotate_left(1);
+        self.rf.write_z(false);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x80 == 0x80);
+        self.rf.a = res;
+    }
+
+    fn rla(&mut self) {
+        let val = self.rf.a;
+        let res = (val << 1) | (self.rf.read_c() as u8);
+        self.rf.write_z(false);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x80 == 0x80);
+        self.rf.a = res;
+    }
+
+    fn rrca(&mut self) {
+        let val = self.rf.a;
+        let res = val.rotate_right(1);
+        self.rf.write_z(false);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x1 == 0x1);
+        self.rf.a = res;
+    }
+
+    fn rra(&mut self) {
+        let val = self.rf.a;
+        let res = (val >> 1) | ((self.rf.read_c() as u8) << 7);
+        self.rf.write_z(false);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x1 == 0x1);
+        self.rf.a = res;
+    }
+
     fn inc16(&mut self, opcode: u8) {
         match opcode {
             0x03 => self.rf.write_bc(self.rf.read_bc().wrapping_add(1)),
@@ -479,6 +543,160 @@ impl Cpu {
         self.rf.write_h((val & 0xF) == 0x0);
 
         self.write_r8(reg, res);
+    }
+
+    fn add16(&mut self, opcode: u8) {
+        let a = self.rf.read_hl();
+        let b = match opcode {
+            0x09 => self.rf.read_bc(),
+            0x19 => self.rf.read_de(),
+            0x29 => self.rf.read_hl(),
+            0x39 => self.rf.sp,
+            _ => panic!("invalid opcode {:#04X} in add16", opcode),
+        };
+
+        let res = a.wrapping_add(b);
+        self.rf.write_n(false);
+        self.rf.write_h((a & 0x0FFF) + (b & 0x0FFF) > 0x0FFF);
+        self.rf.write_c(res < a);
+        self.rf.write_hl(res);
+    }
+
+    fn add(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let a = self.rf.a;
+        let b = if opcode == 0xC6 {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a.wrapping_add(b);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h((a & 0xF) + (b & 0xF) > 0xF);
+        self.rf.write_c((a as u16) + (b as u16) > 0xFF);
+        self.rf.a = res;
+    }
+
+    fn adc(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let c = self.rf.read_c() as u8;
+        let a = self.rf.a;
+        let b = if opcode == 0xCE {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a.wrapping_add(b).wrapping_add(c);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h((a & 0xF) + (b & 0xF) + c > 0xF);
+        self.rf.write_c((a as u16) + (b as u16) + (c as u16) > 0xFF);
+        self.rf.a = res;
+    }
+
+    fn sub(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let a = self.rf.a;
+        let b = if opcode == 0xD6 {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a.wrapping_sub(b);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(true);
+        self.rf.write_h((a & 0xF) < (b & 0xF));
+        self.rf.write_c(a < b);
+        self.rf.a = res;
+    }
+
+    fn sbc(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let c = self.rf.read_c() as u8;
+        let a = self.rf.a;
+        let b = if opcode == 0xDE {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a.wrapping_sub(b).wrapping_sub(c);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(true);
+        self.rf.write_h((a & 0xF) < (b & 0xF) + c);
+        self.rf.write_c((a as u16) < (b as u16) + (c as u16));
+        self.rf.a = res;
+    }
+
+    fn and(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let a = self.rf.a;
+        let b = if opcode == 0xE6 {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a & b;
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(true);
+        self.rf.write_c(false);
+        self.rf.a = res;
+    }
+
+    fn xor(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let a = self.rf.a;
+        let b = if opcode == 0xEE {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a ^ b;
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(false);
+        self.rf.a = res;
+    }
+
+    fn or(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let a = self.rf.a;
+        let b = if opcode == 0xF6 {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a | b;
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(false);
+        self.rf.a = res;
+    }
+
+    fn cp(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let a = self.rf.a;
+        let b = if opcode == 0xFE {
+            self.fetch_u8()
+        } else {
+            self.read_r8(reg)
+        };
+
+        let res = a.wrapping_sub(b);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(true);
+        self.rf.write_h((a & 0xF) < (b & 0xF));
+        self.rf.write_c(a < b);
     }
 }
 
