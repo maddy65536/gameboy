@@ -319,12 +319,26 @@ impl Cpu {
         self.bus.write_u8(self.rf.read_hl(), val);
     }
 
+    pub fn write_r8(&mut self, reg: u8, val: u8) {
+        match reg {
+            HL_IND_REG_NUM => self.write_hl_ind(val),
+            _ => self.rf[reg] = val,
+        }
+    }
+
+    pub fn read_r8(&self, reg: u8) -> u8 {
+        match reg {
+            HL_IND_REG_NUM => self.read_hl_ind(),
+            _ => self.rf[reg],
+        }
+    }
+
     pub fn execute_instruction(&mut self) -> usize {
         let opcode = self.fetch_u8();
 
         match opcode {
-            0xCB => return self.cb_execute_instruction(),
-            0x00 => (), // NOP
+            0x00 => (),                                   // NOP
+            0xCB => return self.cb_execute_instruction(), // cb prefixed instructions
             // loads
             0x01 | 0x11 | 0x21 | 0x31 => self.ld_r16_imm(opcode),
             0x06 | 0x16 | 0x26 | 0x36 | 0x0E | 0x1E | 0x2E | 0x3E => self.ld_r8_imm(opcode),
@@ -338,7 +352,7 @@ impl Cpu {
             _ => unimplemented!(
                 "unimplemented opcode {:#04X} at pc {:#06X}",
                 opcode,
-                self.rf.pc - 1
+                self.rf.pc - 1,
             ),
         }
 
@@ -348,15 +362,26 @@ impl Cpu {
     fn cb_execute_instruction(&mut self) -> usize {
         let opcode = self.fetch_u8();
 
-        unimplemented!(
-            "unimplemented CB opcode {:#04X} at pc {:#06X}",
-            opcode,
-            self.rf.pc - 1
-        );
+        match opcode {
+            0x00..=0x07 => self.rlc(opcode),
+            0x08..=0x0F => self.rrc(opcode),
+            0x10..=0x17 => self.rl(opcode),
+            0x18..=0x1F => self.rr(opcode),
+            0x20..=0x27 => self.sla(opcode),
+            0x28..=0x2F => self.sra(opcode),
+            0x30..=0x37 => self.swap(opcode),
+            0x38..=0x3F => self.srl(opcode),
+            0x40..=0x7F => self.bit(opcode),
+            0x80..=0xBF => self.res(opcode),
+            0xC0..=0xFF => self.set(opcode),
+        }
 
         CB_INSTRUCTION_TIMINGS[opcode as usize]
     }
+}
 
+// instructions
+impl Cpu {
     // load a 16 bit register from an immediate
     fn ld_r16_imm(&mut self, opcode: u8) {
         let imm = self.fetch_u16();
@@ -409,13 +434,7 @@ impl Cpu {
     fn ld_r8(&mut self, opcode: u8) {
         let src = opcode & 7;
         let dest = (opcode >> 3) & 7;
-        if src == HL_IND_REG_NUM {
-            self.rf[dest] = self.read_hl_ind()
-        } else if dest == HL_IND_REG_NUM {
-            self.write_hl_ind(self.rf[src]);
-        } else {
-            self.rf[dest] = self.rf[src];
-        }
+        self.write_r8(dest, self.read_r8(src));
     }
 
     fn inc16(&mut self, opcode: u8) {
@@ -428,22 +447,16 @@ impl Cpu {
         }
     }
 
-    fn inc(&mut self, val: u8) -> u8 {
+    fn inc8(&mut self, opcode: u8) {
+        let reg = (opcode >> 3) & 7;
+        let val = self.read_r8(reg);
+
         let res = val.wrapping_add(1);
         self.rf.write_z(res == 0);
         self.rf.write_n(false);
         self.rf.write_h((val & 0xF) + 1 > 0xF);
-        res
-    }
 
-    fn inc8(&mut self, opcode: u8) {
-        let reg = (opcode >> 3) & 7;
-        if reg == HL_IND_REG_NUM {
-            let res = self.inc(self.read_hl_ind());
-            self.write_hl_ind(res);
-        } else {
-            self.rf[reg] = self.inc(self.rf[reg]);
-        }
+        self.write_r8(reg, res);
     }
 
     fn dec16(&mut self, opcode: u8) {
@@ -456,21 +469,142 @@ impl Cpu {
         }
     }
 
-    fn dec(&mut self, val: u8) -> u8 {
+    fn dec8(&mut self, opcode: u8) {
+        let reg = (opcode >> 3) & 7;
+        let val = self.read_r8(reg);
+
         let res = val.wrapping_sub(1);
         self.rf.write_z(res == 0);
         self.rf.write_n(true);
         self.rf.write_h((val & 0xF) == 0x0);
-        res
+
+        self.write_r8(reg, res);
+    }
+}
+
+// CB instructions
+impl Cpu {
+    fn rlc(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = val.rotate_left(1);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x80 == 0x80);
+        self.write_r8(reg, res);
     }
 
-    fn dec8(&mut self, opcode: u8) {
-        let reg = (opcode >> 3) & 7;
-        if reg == HL_IND_REG_NUM {
-            let res = self.dec(self.read_hl_ind());
-            self.write_hl_ind(res);
-        } else {
-            self.rf[reg] = self.dec(self.rf[reg]);
-        }
+    fn rrc(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = val.rotate_right(1);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x1 == 0x1);
+        self.write_r8(reg, res);
+    }
+
+    fn rl(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = (val << 1) | (self.rf.read_c() as u8);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x80 == 0x80);
+        self.write_r8(reg, res);
+    }
+
+    fn rr(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = (val >> 1) | ((self.rf.read_c() as u8) << 7);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x1 == 0x1);
+        self.write_r8(reg, res);
+    }
+
+    fn sla(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = val << 1;
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x80 == 0x80);
+        self.write_r8(reg, res);
+    }
+
+    fn sra(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = (val >> 1) | (val & 0x80);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x1 == 0x1);
+        self.write_r8(reg, res);
+    }
+
+    fn swap(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = ((val & 0xF0) >> 4) | ((val & 0x0F) << 4);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(false);
+        self.write_r8(reg, res);
+    }
+
+    fn srl(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let val = self.read_r8(reg);
+
+        let res = (val >> 1);
+        self.rf.write_z(res == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(val & 0x1 == 0x1);
+        self.write_r8(reg, res);
+    }
+
+    fn bit(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let idx = (opcode >> 3) & 7;
+        let val = self.read_r8(reg);
+
+        self.rf.write_z(val & (0x1 << idx) == 0);
+        self.rf.write_n(false);
+        self.rf.write_h(true);
+    }
+
+    fn res(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let idx = (opcode >> 3) & 7;
+        let val = self.read_r8(reg);
+
+        let res = val & !(0x1 << idx);
+        self.write_r8(reg, res);
+    }
+
+    fn set(&mut self, opcode: u8) {
+        let reg = opcode & 7;
+        let idx = (opcode >> 3) & 7;
+        let val = self.read_r8(reg);
+
+        let res = val | (0x1 << idx);
+        self.write_r8(reg, res);
     }
 }
