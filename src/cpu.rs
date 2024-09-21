@@ -218,32 +218,6 @@ impl Cpu {
         }
     }
 
-    pub fn from_state(state: &State) -> Self {
-        let mut rf = RegisterFile::default();
-        let mut bus = Bus::new();
-
-        rf.a = state.a;
-        rf.f = state.f;
-        rf.b = state.b;
-        rf.c = state.c;
-        rf.d = state.d;
-        rf.e = state.e;
-        rf.h = state.h;
-        rf.l = state.l;
-        rf.sp = state.sp;
-        rf.pc = state.pc;
-
-        for (addr, val) in state.ram.iter().cloned() {
-            bus.write_u8(addr, val);
-        }
-
-        Self {
-            rf,
-            bus,
-            ime: false,
-        }
-    }
-
     pub fn reset(&mut self) {
         self.rf.a = 0;
         self.rf.f = 0;
@@ -833,7 +807,7 @@ impl Cpu {
         self.rf.write_h((a & 0xF) + ((b as u16) & 0xF) > 0xF);
         self.rf.write_c((a & 0xFF) + (b as u16) > 0xFF);
 
-        self.rf.sp = (a.wrapping_add_signed((b as i8) as i16));
+        self.rf.sp = a.wrapping_add_signed((b as i8) as i16);
     }
 
     // branches
@@ -1019,7 +993,7 @@ impl Cpu {
         let reg = opcode & 7;
         let val = self.read_r8(reg);
 
-        let res = (val >> 1);
+        let res = val >> 1;
         self.rf.write_z(res == 0);
         self.rf.write_n(false);
         self.rf.write_h(false);
