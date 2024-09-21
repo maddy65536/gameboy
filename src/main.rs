@@ -20,9 +20,9 @@ fn main() {
         for file in fs::read_dir("../sm83/v1/").unwrap() {
             let path = file.unwrap().path();
             let path_str = path.to_str().unwrap();
-            if path_str.contains("10.json") {
+            if path_str.contains("/10.json") {
                 println!("\x1b[1;31mSKIPPING STOP\x1b[0m");
-            } else if path_str.contains("76.json") {
+            } else if path_str.contains("/76.json") {
                 println!("\x1b[1;31mSKIPPING HALT\x1b[0m")
             } else {
                 failed = failed || run_tests(path_str);

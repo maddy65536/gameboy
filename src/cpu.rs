@@ -363,6 +363,8 @@ impl Cpu {
             0xC1 | 0xD1 | 0xE1 | 0xF1 => self.pop(opcode),
             0xC5 | 0xD5 | 0xE5 | 0xF5 => self.push(opcode),
             0xF8 => self.ld_hl_sp_offset(),
+            0xE0 | 0xF0 | 0xE2 | 0xF2 => self.ld_a_ind_offset(opcode),
+            0xEA | 0xFA => self.ld_a_ind(opcode),
             // math
             0x07 => self.rlca(),
             0x17 => self.rla(),
@@ -506,6 +508,42 @@ impl Cpu {
             0xE5 => self.push_u16(self.rf.read_hl()),
             0xF5 => self.push_u16(self.rf.read_af()),
             _ => panic!("invalid opcode {:#04X} in push", opcode),
+        }
+    }
+
+    fn ld_hl_sp_offset(&mut self) {
+        let a = self.rf.sp;
+        let b = self.fetch_u8();
+
+        self.rf.write_z(false);
+        self.rf.write_n(false);
+        self.rf.write_h((a & 0xF) + ((b as u16) & 0xF) > 0xF);
+        self.rf.write_c((a & 0xFF) + (b as u16) > 0xFF);
+
+        self.rf.write_hl(a.wrapping_add_signed((b as i8) as i16));
+    }
+
+    fn ld_a_ind_offset(&mut self, opcode: u8) {
+        let offset = if opcode == 0xE0 || opcode == 0xF0 {
+            self.fetch_u8()
+        } else {
+            self.rf.c
+        } as u16;
+        match opcode {
+            0xE0 => self.bus.write_u8(0xFF00 + offset, self.rf.a),
+            0xF0 => self.rf.a = self.bus.read_u8(0xFF00 + offset),
+            0xE2 => self.bus.write_u8(0xFF00 + offset, self.rf.a),
+            0xF2 => self.rf.a = self.bus.read_u8(0xFF00 + offset),
+            _ => panic!("invalid opcode {:#04X} in la_a_ind_offset", opcode),
+        }
+    }
+
+    fn ld_a_ind(&mut self, opcode: u8) {
+        let addr = self.fetch_u16();
+        match opcode {
+            0xEA => self.bus.write_u8(addr, self.rf.a),
+            0xFA => self.rf.a = self.bus.read_u8(addr),
+            _ => panic!("invalid opcode {:#04X} in la_a_ind", opcode),
         }
     }
 
@@ -784,6 +822,18 @@ impl Cpu {
         self.rf.write_n(false);
         self.rf.write_h(false);
         self.rf.write_c(!self.rf.read_c());
+    }
+
+    fn add_sp_imm(&mut self) {
+        let a = self.rf.sp;
+        let b = self.fetch_u8();
+
+        self.rf.write_z(false);
+        self.rf.write_n(false);
+        self.rf.write_h((a & 0xF) + ((b as u16) & 0xF) > 0xF);
+        self.rf.write_c((a & 0xFF) + (b as u16) > 0xFF);
+
+        self.rf.sp = (a.wrapping_add_signed((b as i8) as i16));
     }
 
     // branches
