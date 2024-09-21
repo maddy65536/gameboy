@@ -110,7 +110,7 @@ impl RegisterFile {
     // r/w 16-bit registers
     pub fn write_af(&mut self, val: u16) {
         self.a = ((val & 0xFF00) >> 8) as u8;
-        self.f = (val & 0x00FF) as u8;
+        self.f = (val & 0x00F0) as u8;
     }
 
     pub fn read_af(&self) -> u16 {
@@ -299,13 +299,13 @@ impl Cpu {
         }
     }
 
-    pub fn fetch_u8(&mut self) -> u8 {
+    fn fetch_u8(&mut self) -> u8 {
         let res = self.bus.read_u8(self.rf.pc);
         self.rf.pc = self.rf.pc.wrapping_add(1);
         res
     }
 
-    pub fn fetch_u16(&mut self) -> u16 {
+    fn fetch_u16(&mut self) -> u16 {
         let res = self.bus.read_u16(self.rf.pc);
         self.rf.pc = self.rf.pc.wrapping_add(2);
         res
@@ -319,18 +319,29 @@ impl Cpu {
         self.bus.write_u8(self.rf.read_hl(), val);
     }
 
-    pub fn write_r8(&mut self, reg: u8, val: u8) {
+    fn write_r8(&mut self, reg: u8, val: u8) {
         match reg {
             HL_IND_REG_NUM => self.write_hl_ind(val),
             _ => self.rf[reg] = val,
         }
     }
 
-    pub fn read_r8(&self, reg: u8) -> u8 {
+    fn read_r8(&self, reg: u8) -> u8 {
         match reg {
             HL_IND_REG_NUM => self.read_hl_ind(),
             _ => self.rf[reg],
         }
+    }
+
+    fn push_u16(&mut self, val: u16) {
+        self.rf.sp = self.rf.sp.wrapping_sub(2);
+        self.bus.write_u16(self.rf.sp, val);
+    }
+
+    fn pop_u16(&mut self) -> u16 {
+        let val = self.bus.read_u16(self.rf.sp);
+        self.rf.sp = self.rf.sp.wrapping_add(2);
+        val
     }
 
     pub fn execute_instruction(&mut self) -> usize {
@@ -349,6 +360,9 @@ impl Cpu {
             0x40..=0x75 | 0x77..=0x7F => self.ld_r8(opcode),
             0x08 => self.ld_ind_imm_sp(),
             0xF9 => self.ld_sp(),
+            0xC1 | 0xD1 | 0xE1 | 0xF1 => self.pop(opcode),
+            0xC5 | 0xD5 | 0xE5 | 0xF5 => self.push(opcode),
+            0xF8 => self.ld_hl_sp_offset(),
             // math
             0x07 => self.rlca(),
             0x17 => self.rla(),
@@ -371,10 +385,15 @@ impl Cpu {
             0x37 => self.scf(),
             0x2F => self.cpl(),
             0x3F => self.ccf(),
+            0xE8 => self.add_sp_imm(),
             // branches
             0x18 | 0x28 | 0x38 | 0x20 | 0x30 => return self.jr(opcode),
+            0xC0 | 0xD0 | 0xC8 | 0xD8 | 0xC9 | 0xD9 => return self.ret(opcode),
+            0xC2 | 0xD2 | 0xC3 | 0xE9 | 0xCA | 0xDA => return self.jp(opcode),
+            0xC4 | 0xD4 | 0xCC | 0xDC | 0xCD => return self.call(opcode),
+            0xC7 | 0xD7 | 0xE7 | 0xF7 | 0xCF | 0xDF | 0xEF | 0xFF => self.rst(opcode),
             _ => unimplemented!(
-                "unimplemented opcode {} at pc {:#06X}",
+                "unimplemented opcode {:#04X} at pc {:#06X}",
                 opcode,
                 self.rf.pc - 1,
             ),
@@ -467,6 +486,27 @@ impl Cpu {
 
     fn ld_sp(&mut self) {
         self.rf.sp = self.rf.read_hl();
+    }
+
+    fn pop(&mut self, opcode: u8) {
+        let val = self.pop_u16();
+        match opcode {
+            0xC1 => self.rf.write_bc(val),
+            0xD1 => self.rf.write_de(val),
+            0xE1 => self.rf.write_hl(val),
+            0xF1 => self.rf.write_af(val),
+            _ => panic!("invalid opcode {:#04X} in pop", opcode),
+        }
+    }
+
+    fn push(&mut self, opcode: u8) {
+        match opcode {
+            0xC5 => self.push_u16(self.rf.read_bc()),
+            0xD5 => self.push_u16(self.rf.read_de()),
+            0xE5 => self.push_u16(self.rf.read_hl()),
+            0xF5 => self.push_u16(self.rf.read_af()),
+            _ => panic!("invalid opcode {:#04X} in push", opcode),
+        }
     }
 
     // math
@@ -763,6 +803,79 @@ impl Cpu {
         } else {
             INSTRUCTION_TIMINGS[opcode as usize]
         }
+    }
+
+    fn ret(&mut self, opcode: u8) -> usize {
+        let cond = match opcode {
+            0xC0 => !self.rf.read_z(),
+            0xD0 => !self.rf.read_c(),
+            0xC8 => self.rf.read_z(),
+            0xD8 => self.rf.read_c(),
+            0xC9 => true,
+            0xD9 => {
+                self.ime = true;
+                true
+            }
+            _ => panic!("invalid opcode {:#04X} in ret", opcode),
+        };
+
+        if cond {
+            self.rf.pc = self.pop_u16();
+            INSTRUCTION_TIMINGS_BRANCH[opcode as usize]
+        } else {
+            INSTRUCTION_TIMINGS[opcode as usize]
+        }
+    }
+
+    fn jp(&mut self, opcode: u8) -> usize {
+        let addr = if opcode == 0xE9 {
+            self.rf.read_hl()
+        } else {
+            self.fetch_u16()
+        };
+
+        let cond = match opcode {
+            0xC2 => !self.rf.read_z(),
+            0xD2 => !self.rf.read_c(),
+            0xCA => self.rf.read_z(),
+            0xDA => self.rf.read_c(),
+            0xC3 => true,
+            0xE9 => true,
+            _ => panic!("invalid opcode {:#04X} in jp", opcode),
+        };
+
+        if cond {
+            self.rf.pc = addr;
+            INSTRUCTION_TIMINGS_BRANCH[opcode as usize]
+        } else {
+            INSTRUCTION_TIMINGS[opcode as usize]
+        }
+    }
+
+    fn call(&mut self, opcode: u8) -> usize {
+        let addr = self.fetch_u16();
+
+        let cond = match opcode {
+            0xC4 => !self.rf.read_z(),
+            0xD4 => !self.rf.read_c(),
+            0xCC => self.rf.read_z(),
+            0xDC => self.rf.read_c(),
+            0xCD => true,
+            _ => panic!("invalid opcode {:#04X} in call", opcode),
+        };
+
+        if cond {
+            self.push_u16(self.rf.pc);
+            self.rf.pc = addr;
+            INSTRUCTION_TIMINGS_BRANCH[opcode as usize]
+        } else {
+            INSTRUCTION_TIMINGS[opcode as usize]
+        }
+    }
+
+    fn rst(&mut self, opcode: u8) {
+        self.push_u16(self.rf.pc);
+        self.rf.pc = (opcode & 0x38) as u16;
     }
 }
 
