@@ -29,7 +29,7 @@ const INSTRUCTION_TIMINGS: [usize; 256] = [
 const INSTRUCTION_TIMINGS_BRANCH: [usize; 256] = [
 // +0  +1  +2  +3  +4  +5  +6  +7  +8  +9  +A  +B  +C  +D  +E  +F
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x00
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x10
+    0,  0,  0,  0,  0,  0,  0,  0,  12, 0,  0,  0,  0,  0,  0,  0,  // 0x10
     12, 0,  0,  0,  0,  0,  0,  0,  12, 0,  0,  0,  0,  0,  0,  0,  // 0x20
     12, 0,  0,  0,  0,  0,  0,  0,  12, 0,  0,  0,  0,  0,  0,  0,  // 0x30
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x40
@@ -40,10 +40,10 @@ const INSTRUCTION_TIMINGS_BRANCH: [usize; 256] = [
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x90
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0xA0
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0xB0
-    20, 0,  16, 0,  24, 0,  0,  0,  20, 0,  16, 0,  24, 0,  0,  0,  // 0xC0
-    20, 0,  16, 0,  24, 0,  0,  0,  20, 0,  16, 0,  24, 0,  0,  0,  // 0xD0
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0xE0
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0xF0
+    20, 0,  16, 16, 24, 0,  0,  16, 20, 16, 16, 0,  24, 24, 0,  16, // 0xC0
+    20, 0,  16, 0,  24, 0,  0,  16, 20, 16, 16, 0,  24, 0,  0,  16, // 0xD0
+    0,  0,  0,  0,  0,  0,  0,  16, 0,  16, 0,  0,  0,  0,  0,  16, // 0xE0
+    0,  0,  0,  0,  0,  0,  0,  16, 0,  0,  0,  0,  0,  0,  0,  16, // 0xF0
 ];
 
 // CB prefixed instruction timings in T-cycles
@@ -337,8 +337,11 @@ impl Cpu {
         let opcode = self.fetch_u8();
 
         match opcode {
+            //misc
             0x00 => (),                                   // NOP
             0xCB => return self.cb_execute_instruction(), // cb prefixed instructions
+            0xF3 => self.ime = false,                     // DI
+            0xFB => self.ime = true,                      // EI
             // loads
             0x01 | 0x11 | 0x21 | 0x31 => self.ld_r16_imm(opcode),
             0x06 | 0x16 | 0x26 | 0x36 | 0x0E | 0x1E | 0x2E | 0x3E => self.ld_r8_imm(opcode),
@@ -364,8 +367,14 @@ impl Cpu {
             0xA8..=0xAF | 0xEE => self.xor(opcode),
             0xB0..=0xB7 | 0xF6 => self.or(opcode),
             0xB8..=0xBF | 0xFE => self.cp(opcode),
+            0x27 => self.daa(),
+            0x37 => self.scf(),
+            0x2F => self.cpl(),
+            0x3F => self.ccf(),
+            // branches
+            0x18 | 0x28 | 0x38 | 0x20 | 0x30 => return self.jr(opcode),
             _ => unimplemented!(
-                "unimplemented opcode {:#04X} at pc {:#06X}",
+                "unimplemented opcode {} at pc {:#06X}",
                 opcode,
                 self.rf.pc - 1,
             ),
@@ -397,7 +406,7 @@ impl Cpu {
 
 // instructions
 impl Cpu {
-    // load a 16 bit register from an immediate
+    // loads
     fn ld_r16_imm(&mut self, opcode: u8) {
         let imm = self.fetch_u16();
         match opcode {
@@ -419,7 +428,6 @@ impl Cpu {
         }
     }
 
-    // load or store from accumulator at an address in a 16 bit register
     fn ld_ind_a(&mut self, opcode: u8) {
         match opcode {
             0x02 => self.bus.write_u8(self.rf.read_bc(), self.rf.a),
@@ -461,6 +469,7 @@ impl Cpu {
         self.rf.sp = self.rf.read_hl();
     }
 
+    // math
     fn rlca(&mut self) {
         let val = self.rf.a;
         let res = val.rotate_left(1);
@@ -697,6 +706,63 @@ impl Cpu {
         self.rf.write_n(true);
         self.rf.write_h((a & 0xF) < (b & 0xF));
         self.rf.write_c(a < b);
+    }
+
+    // ough
+    fn daa(&mut self) {
+        let mut res = self.rf.a;
+        let mut offset = 0;
+        offset |= 0x60 * (self.rf.read_c() as u8); // branchless gaming
+        offset |= 0x06 * (self.rf.read_h() as u8);
+        if self.rf.read_n() {
+            res = res.wrapping_sub(offset);
+        } else {
+            offset |= 0x06 * ((res & 0xF > 0x9) as u8);
+            offset |= 0x60 * ((res > 0x99) as u8);
+            res = res.wrapping_add(offset);
+        }
+
+        self.rf.write_z(res == 0);
+        self.rf.write_h(false);
+        self.rf.write_c(offset >= 0x60);
+        self.rf.a = res;
+    }
+
+    fn scf(&mut self) {
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(true);
+    }
+
+    fn cpl(&mut self) {
+        self.rf.write_n(true);
+        self.rf.write_h(true);
+        self.rf.a = !self.rf.a;
+    }
+
+    fn ccf(&mut self) {
+        self.rf.write_n(false);
+        self.rf.write_h(false);
+        self.rf.write_c(!self.rf.read_c());
+    }
+
+    // branches
+    fn jr(&mut self, opcode: u8) -> usize {
+        let offset = self.fetch_u8() as i8;
+        let cond = match opcode {
+            0x18 => true,
+            0x28 => self.rf.read_z(),
+            0x38 => self.rf.read_c(),
+            0x20 => !self.rf.read_z(),
+            0x30 => !self.rf.read_c(),
+            _ => panic!("invalid opcode {:#04X} in jr", opcode),
+        };
+        if cond {
+            self.rf.pc = self.rf.pc.wrapping_add_signed(offset as i16);
+            INSTRUCTION_TIMINGS_BRANCH[opcode as usize]
+        } else {
+            INSTRUCTION_TIMINGS[opcode as usize]
+        }
     }
 }
 

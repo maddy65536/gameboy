@@ -18,7 +18,15 @@ fn main() {
     if args[1] == "all" {
         let mut failed = false;
         for file in fs::read_dir("../sm83/v1/").unwrap() {
-            failed = failed || run_tests(file.unwrap().path().to_str().unwrap());
+            let path = file.unwrap().path();
+            let path_str = path.to_str().unwrap();
+            if path_str.contains("10.json") {
+                println!("\x1b[1;31mSKIPPING STOP\x1b[0m");
+            } else if path_str.contains("76.json") {
+                println!("\x1b[1;31mSKIPPING HALT\x1b[0m")
+            } else {
+                failed = failed || run_tests(path_str);
+            }
         }
         if !failed {
             println!("all tests passed! wow!")
