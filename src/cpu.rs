@@ -409,7 +409,7 @@ impl Cpu {
             0x11 => self.rf.write_de(imm),
             0x21 => self.rf.write_hl(imm),
             0x31 => self.rf.sp = imm,
-            _ => panic!("called ld_imm_16 with unsupported opcode {:#04X}", opcode),
+            _ => panic!("invalid opcode {:#04X} in ld_r16_imm", opcode),
         }
     }
 
@@ -441,7 +441,7 @@ impl Cpu {
                 self.rf.a = self.read_hl_ind();
                 self.rf.write_hl(self.rf.read_hl() - 1);
             }
-            _ => panic!("called ld_r16ind_a with unsupported opcode {:#04X}", opcode),
+            _ => panic!("invalid opcode {:#04X} in ld_ind_a", opcode),
         }
     }
 
@@ -564,7 +564,7 @@ impl Cpu {
             0x13 => self.rf.write_de(self.rf.read_de().wrapping_add(1)),
             0x23 => self.rf.write_hl(self.rf.read_hl().wrapping_add(1)),
             0x33 => self.rf.sp = self.rf.sp.wrapping_add(1),
-            _ => panic!("called inc16 with unsupported opcode {:#04X}", opcode),
+            _ => panic!("invalid opcode {:#04X} in inc16", opcode),
         }
     }
 
@@ -586,7 +586,7 @@ impl Cpu {
             0x1B => self.rf.write_de(self.rf.read_de().wrapping_sub(1)),
             0x2B => self.rf.write_hl(self.rf.read_hl().wrapping_sub(1)),
             0x3B => self.rf.sp = self.rf.sp.wrapping_sub(1),
-            _ => panic!("called dec16 with unsupported opcode {:#04X}", opcode),
+            _ => panic!("invalid opcode {:#04X} in dec16", opcode),
         }
     }
 
