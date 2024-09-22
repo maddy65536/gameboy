@@ -416,11 +416,7 @@ impl Cpu {
     fn ld_r8_imm(&mut self, opcode: u8) {
         let imm = self.fetch_u8();
         let reg = (opcode >> 3) & 7;
-        if reg == HL_IND_REG_NUM {
-            self.write_hl_ind(imm);
-        } else {
-            self.rf[reg] = imm;
-        }
+        self.write_r8(reg, imm);
     }
 
     fn ld_ind_a(&mut self, opcode: u8) {
