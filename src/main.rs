@@ -1,3 +1,4 @@
+use cart::Cart;
 use cpu::Cpu;
 use cpu::State;
 use serde::Deserialize;
@@ -5,9 +6,8 @@ use std::env;
 use std::fs;
 
 mod bus;
+mod cart;
 mod cpu;
-
-const TEST_PATH: &str = "../sm83/v1/";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -15,64 +15,10 @@ fn main() {
         panic!(":(");
     }
 
-    if args[1] == "all" {
-        let mut failed = false;
-        for file in fs::read_dir("../sm83/v1/").unwrap() {
-            let path = file.unwrap().path();
-            let path_str = path.to_str().unwrap();
-            if path_str.contains("/10.json") {
-                println!("\x1b[1;31mSKIPPING STOP\x1b[0m");
-            } else if path_str.contains("/76.json") {
-                println!("\x1b[1;31mSKIPPING HALT\x1b[0m")
-            } else {
-                failed = failed || run_tests(path_str);
-            }
-        }
-        if !failed {
-            println!("all tests passed! wow!")
-        }
-    } else {
-        for arg in args.iter().skip(1) {
-            run_tests(&(TEST_PATH.to_owned() + arg));
-        }
+    let rom: Vec<u8> = fs::read(&args[1]).unwrap();
+    let mut cpu = Cpu::new(Cart::new(rom));
+    cpu.simulate_boot();
+    loop {
+        cpu.tick();
     }
-}
-
-fn run_tests(path: &str) -> bool {
-    let mut failed = false;
-    let data = fs::read_to_string(path).unwrap();
-    let tests: Vec<Test> = serde_json::from_str(&data).unwrap();
-    println!("running test: {}", path);
-
-    let mut cpu = Cpu::new();
-
-    for test in tests {
-        cpu.set_state(&test.initial);
-        // println!("test name: {}", test.name);
-        cpu.execute_instruction();
-        let final_state = cpu.to_state();
-        if test.end != final_state {
-            failed = true;
-            println!("----------------------------------------------------------------");
-            println!(
-                "test name: {}\ninitial: {:#?}\nexpected: {:#?}\nactual: {:#?}",
-                test.name, test.initial, test.end, final_state
-            );
-            println!("----------------------------------------------------------------");
-        }
-        cpu.reset();
-    }
-
-    if !failed {
-        println!("all tests passed! yay!");
-    }
-    failed
-}
-
-#[derive(Debug, Deserialize)]
-struct Test {
-    name: String,
-    initial: State,
-    #[serde(alias = "final")]
-    end: State,
 }

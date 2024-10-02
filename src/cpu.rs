@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::bus::Bus;
+use crate::{bus::Bus, cart::Cart};
 
 // instruction timings in T-cycles
 #[rustfmt::skip]
@@ -75,6 +75,7 @@ pub struct Cpu {
     rf: RegisterFile,
     bus: Bus,
     ime: bool,
+    halted: bool,
 }
 
 #[derive(Debug, Default)]
@@ -210,67 +211,30 @@ impl std::ops::IndexMut<u8> for RegisterFile {
 }
 
 impl Cpu {
-    pub fn new() -> Self {
+    pub fn new(cart: Cart) -> Self {
         Self {
             rf: RegisterFile::default(),
-            bus: Bus::new(),
+            bus: Bus::new(cart),
             ime: false,
+            halted: false,
         }
     }
 
-    pub fn reset(&mut self) {
-        self.rf.a = 0;
-        self.rf.f = 0;
-        self.rf.b = 0;
-        self.rf.c = 0;
-        self.rf.d = 0;
-        self.rf.e = 0;
-        self.rf.h = 0;
-        self.rf.l = 0;
-        self.rf.sp = 0;
-        self.rf.pc = 0;
-        self.bus.reset();
+    pub fn tick(&mut self) {
+        self.execute_instruction();
     }
 
-    pub fn set_state(&mut self, state: &State) {
-        self.rf.a = state.a;
-        self.rf.f = state.f;
-        self.rf.b = state.b;
-        self.rf.c = state.c;
-        self.rf.d = state.d;
-        self.rf.e = state.e;
-        self.rf.h = state.h;
-        self.rf.l = state.l;
-        self.rf.sp = state.sp;
-        self.rf.pc = state.pc;
-
-        for (addr, val) in state.ram.iter().cloned() {
-            self.bus.write_u8(addr, val);
-        }
-    }
-
-    pub fn to_state(&self) -> State {
-        State {
-            a: self.rf.a,
-            f: self.rf.f,
-            b: self.rf.b,
-            c: self.rf.c,
-            d: self.rf.d,
-            e: self.rf.e,
-            h: self.rf.h,
-            l: self.rf.l,
-            sp: self.rf.sp,
-            pc: self.rf.pc,
-            ram: self
-                .bus
-                .ram
-                .iter()
-                .cloned()
-                .enumerate()
-                .map(|x| (x.0 as u16, x.1))
-                .filter(|x| self.bus.touched.contains(&x.0))
-                .collect(),
-        }
+    pub fn simulate_boot(&mut self) {
+        self.rf.a = 0x01;
+        self.rf.write_z(true);
+        self.rf.b = 0x00;
+        self.rf.c = 0x13;
+        self.rf.d = 0x00;
+        self.rf.e = 0xD8;
+        self.rf.h = 0x01;
+        self.rf.l = 0x4D;
+        self.rf.pc = 0x0100;
+        self.rf.sp = 0xFFFE;
     }
 
     fn fetch_u8(&mut self) -> u8 {
@@ -319,14 +283,19 @@ impl Cpu {
     }
 
     pub fn execute_instruction(&mut self) -> usize {
-        let opcode = self.fetch_u8();
+        if self.halted {
+            return 4;
+        }
 
+        let opcode = self.fetch_u8();
         match opcode {
             //misc
             0x00 => (),                                   // NOP
             0xCB => return self.cb_execute_instruction(), // cb prefixed instructions
             0xF3 => self.ime = false,                     // DI
             0xFB => self.ime = true,                      // EI
+            0x10 => unimplemented!("STOP"),               // STOP
+            0x76 => self.halted = true,                   // HALT
             // loads
             0x01 | 0x11 | 0x21 | 0x31 => self.ld_r16_imm(opcode),
             0x06 | 0x16 | 0x26 | 0x36 | 0x0E | 0x1E | 0x2E | 0x3E => self.ld_r8_imm(opcode),
