@@ -1,7 +1,5 @@
 use cart::Cart;
 use cpu::Cpu;
-use cpu::State;
-use serde::Deserialize;
 use std::env;
 use std::fs;
 

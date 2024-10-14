@@ -220,10 +220,6 @@ impl Cpu {
         }
     }
 
-    pub fn tick(&mut self) {
-        self.execute_instruction();
-    }
-
     pub fn simulate_boot(&mut self) {
         self.rf.a = 0x01;
         self.rf.write_z(true);
@@ -235,6 +231,41 @@ impl Cpu {
         self.rf.l = 0x4D;
         self.rf.pc = 0x0100;
         self.rf.sp = 0xFFFE;
+    }
+
+    pub fn tick(&mut self) {
+        let icycles = self.handle_interrupts();
+        let cycles = icycles + self.execute_instruction();
+        self.bus.tick(cycles);
+    }
+
+    fn handle_interrupts(&mut self) -> usize {
+        let i_flags = self.bus.read_u8(0xFF0F);
+        let i_enable = self.bus.read_u8(0xFFFF);
+
+        if i_flags & i_enable != 0 {
+            if self.ime {
+                let int = i_flags.trailing_zeros(); // is this a clever way to do this? i hope so!
+                let addr = match int {
+                    0 => 0x0040, // VBlank
+                    1 => 0x0048, // LCD
+                    2 => 0x0050, // Timer
+                    3 => 0x0058, // Serial
+                    4 => 0x0060, // Joypad
+                    _ => panic!("invalid interrupt??: {}", int),
+                };
+
+                self.ime = false;
+                self.bus.write_u8(0xFF0F, i_flags & !(1 << int)); // update IF
+                self.push_u16(self.rf.pc);
+                self.rf.pc = addr
+            }
+
+            self.halted = false;
+            return 20;
+        }
+
+        0
     }
 
     fn fetch_u8(&mut self) -> u8 {

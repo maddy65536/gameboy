@@ -14,20 +14,32 @@ impl Bus {
         }
     }
 
+    pub fn tick(&mut self, cycles: usize) {
+        todo!()
+    }
+
+    fn ram_read(&self, addr: u16) -> u8 {
+        return self.ram[addr as usize];
+    }
+
+    fn ram_write(&mut self, addr: u16, val: u8) {
+        self.ram[addr as usize] = val;
+    }
+
     pub fn read_u8(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x3FFF => self.cart.read_u8(addr),
             0x4000..=0x7FFF => self.cart.read_u8(addr),
             0x8000..=0x9FFF => unimplemented!("tried to read vram"),
             0xA000..=0xBFFF => unimplemented!("tried to read cart ram"),
-            0xC000..=0xCFFF => self.ram[addr as usize],
-            0xD000..=0xDFFF => self.ram[addr as usize],
+            0xC000..=0xCFFF => self.ram_read(addr),
+            0xD000..=0xDFFF => self.ram_read(addr),
             0xE000..=0xFDFF => unimplemented!("tried to read echo ram"),
             0xFE00..=0xFE9F => unimplemented!("tried to read OAM"),
             0xFEA0..=0xFEFF => unimplemented!("tried to read FORBIDDEN MEMORY"),
             0xFF00..=0xFF7F => self.io_read_u8(addr),
             0xFF80..=0xFFFE => unimplemented!("tried to read HRAM"),
-            0xFFFF => unimplemented!("tried to read IE"),
+            0xFFFF => self.ram_read(addr), // IE
         }
     }
 
@@ -37,14 +49,14 @@ impl Bus {
             0x4000..=0x7FFF => unimplemented!("tried to write to cart rom bank 01-NN"),
             0x8000..=0x9FFF => unimplemented!("tried to write to vram"),
             0xA000..=0xBFFF => unimplemented!("tried to write to cart ram"),
-            0xC000..=0xCFFF => self.ram[addr as usize] = val,
-            0xD000..=0xDFFF => self.ram[addr as usize] = val,
+            0xC000..=0xCFFF => self.ram_write(addr, val),
+            0xD000..=0xDFFF => self.ram_write(addr, val),
             0xE000..=0xFDFF => unimplemented!("tried to write to echo ram"),
             0xFE00..=0xFE9F => unimplemented!("tried to write to OAM"),
             0xFEA0..=0xFEFF => unimplemented!("tried to write to FORBIDDEN MEMORY"),
             0xFF00..=0xFF7F => self.io_write_u8(addr, val),
             0xFF80..=0xFFFE => unimplemented!("tried to write to HRAM"),
-            0xFFFF => unimplemented!("tried to write to IE"),
+            0xFFFF => self.ram_write(addr, val), // IE
         }
     }
 
@@ -60,9 +72,10 @@ impl Bus {
     fn io_read_u8(&self, addr: u16) -> u8 {
         match addr {
             0xFF00 => unimplemented!("tried to read joypad input"),
-            0xFF01..=0xFF02 => unimplemented!("tried to read serial transfer"),
+            0xFF01 => self.ram_read(addr), // serial data
+            0xFF02 => unimplemented!("tried to read serial transfer"),
             0xFF04..=0xFF07 => unimplemented!("tried to read timer and divider"),
-            0xFF0F => unimplemented!("tried to read IF"),
+            0xFF0F => self.ram_read(addr), // IF
             0xFF10..=0xFF26 => unimplemented!("tried to read audio register"),
             0xFF30..=0xFF3F => unimplemented!("tried to read wave pattern ram"),
             0xFF40..=0xFF4B => unimplemented!("tried to read LCD control"),
@@ -78,9 +91,16 @@ impl Bus {
     fn io_write_u8(&mut self, addr: u16, val: u8) {
         match addr {
             0xFF00 => unimplemented!("tried to write to joypad input"),
-            0xFF01..=0xFF02 => unimplemented!("tried to write to serial transfer"),
+            0xFF01 => self.ram_write(addr, val), // serial data
+            0xFF02 => {
+                if val == 0x81 {
+                    print!("{}", self.ram[0xFF01] as char)
+                } else {
+                    unimplemented!("tried something weird with serial, wrote {:#04X}", val)
+                }
+            }
             0xFF04..=0xFF07 => unimplemented!("tried to write to timer and divider"),
-            0xFF0F => unimplemented!("tried to write to IF"),
+            0xFF0F => self.ram_write(addr, val), // IF
             0xFF10..=0xFF26 => unimplemented!("tried to write to audio register"),
             0xFF30..=0xFF3F => unimplemented!("tried to write to wave pattern ram"),
             0xFF40..=0xFF4B => unimplemented!("tried to write to LCD control"),
