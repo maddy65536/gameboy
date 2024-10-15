@@ -162,6 +162,7 @@ impl Bus {
                 }
             }
             0xFF04..=0xFF07 => self.timer.write_u8(addr, val),
+            0xFF0F => self.ram_write(addr, val), // IF
             _ => (),
         }
     }

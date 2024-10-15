@@ -75,6 +75,7 @@ pub struct Cpu {
     rf: RegisterFile,
     bus: Bus,
     ime: bool,
+    pending_ime: bool,
     halted: bool,
 }
 
@@ -216,6 +217,7 @@ impl Cpu {
             rf: RegisterFile::default(),
             bus: Bus::new(cart),
             ime: false,
+            pending_ime: false,
             halted: false,
         }
     }
@@ -240,11 +242,20 @@ impl Cpu {
 
     pub fn tick(&mut self) {
         let icycles = self.handle_interrupts();
+        if self.pending_ime {
+            self.ime = true;
+            self.pending_ime = false;
+        }
         let cycles = icycles + self.execute_instruction();
         self.bus.tick(cycles);
     }
 
     fn handle_interrupts(&mut self) -> usize {
+        if self.pending_ime {
+            self.ime = true;
+            self.pending_ime = false;
+        }
+
         let i_flags = self.bus.read_u8(0xFF0F);
         let i_enable = self.bus.read_u8(0xFFFF);
 
@@ -328,8 +339,8 @@ impl Cpu {
             //misc
             0x00 => (),                                   // NOP
             0xCB => return self.cb_execute_instruction(), // cb prefixed instructions
-            0xF3 => self.ime = false,                     // DI
-            0xFB => self.ime = true,                      // EI
+            0xF3 => self.di(),                            // DI
+            0xFB => self.ei(),                            // EI
             0x10 => self.stop(),                          // STOP
             0x76 => self.halted = true,                   // HALT
             // loads
@@ -407,6 +418,17 @@ impl Cpu {
 // instructions
 impl Cpu {
     // misc
+    fn di(&mut self) {
+        self.ime = false;
+        self.pending_ime = false;
+    }
+
+    fn ei(&mut self) {
+        if !self.ime {
+            self.pending_ime = true;
+        }
+    }
+
     fn stop(&mut self) {
         self.bus.timer.reset_divider();
     }
