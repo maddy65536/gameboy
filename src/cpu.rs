@@ -231,6 +231,11 @@ impl Cpu {
         self.rf.l = 0x4D;
         self.rf.pc = 0x0100;
         self.rf.sp = 0xFFFE;
+
+        self.bus.timer.div = 0xAB;
+        self.bus.timer.tima = 0x00;
+        self.bus.timer.tma = 0x00;
+        self.bus.timer.tac = 0xF8;
     }
 
     pub fn tick(&mut self) {
@@ -325,7 +330,7 @@ impl Cpu {
             0xCB => return self.cb_execute_instruction(), // cb prefixed instructions
             0xF3 => self.ime = false,                     // DI
             0xFB => self.ime = true,                      // EI
-            0x10 => unimplemented!("STOP"),               // STOP
+            0x10 => self.stop(),                          // STOP
             0x76 => self.halted = true,                   // HALT
             // loads
             0x01 | 0x11 | 0x21 | 0x31 => self.ld_r16_imm(opcode),
@@ -401,6 +406,11 @@ impl Cpu {
 
 // instructions
 impl Cpu {
+    // misc
+    fn stop(&mut self) {
+        self.bus.timer.reset_divider();
+    }
+
     // loads
     fn ld_r16_imm(&mut self, opcode: u8) {
         let imm = self.fetch_u16();

@@ -6,6 +6,7 @@ use std::fs;
 mod bus;
 mod cart;
 mod cpu;
+mod timer;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
