@@ -1,23 +1,31 @@
-use cart::Cart;
-use cpu::Cpu;
+use clap::Parser;
+use eframe::egui;
 use std::env;
-use std::fs;
+
+use crate::gameboy::Gameboy;
+use crate::gui::Gui;
 
 mod bus;
 mod cart;
 mod cpu;
+mod gameboy;
+mod gui;
+mod ppu;
 mod timer;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        panic!(":(");
-    }
+#[derive(Debug, Parser)]
+struct Args {
+    rom_path: String,
+}
 
-    let rom: Vec<u8> = fs::read(&args[1]).unwrap();
-    let mut cpu = Cpu::new(Cart::new(rom));
-    cpu.simulate_boot();
-    loop {
-        cpu.tick();
-    }
+fn main() {
+    let args = Args::parse();
+
+    let gb = Gameboy::new(args.rom_path);
+    let native_options = eframe::NativeOptions::default();
+    let _ = eframe::run_native(
+        "meow",
+        native_options,
+        Box::new(|cc| Ok(Box::new(Gui::new(cc, gb)))),
+    );
 }

@@ -24,7 +24,6 @@ impl Timer {
         }
     }
 
-    /// returns true if interrupt triggered
     pub fn tick(&mut self, cycles: usize) {
         // update div
         self.div_state += cycles;

@@ -1,6 +1,5 @@
-use serde::Deserialize;
-
-use crate::{bus::Bus, cart::Cart};
+use crate::bus::Bus;
+use crate::cart::Cart;
 
 // instruction timings in T-cycles
 #[rustfmt::skip]
@@ -91,21 +90,6 @@ pub struct RegisterFile {
     pub l: u8,
     pub sp: u16,
     pub pc: u16,
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-pub struct State {
-    pub a: u8,
-    pub f: u8,
-    pub b: u8,
-    pub c: u8,
-    pub d: u8,
-    pub e: u8,
-    pub h: u8,
-    pub l: u8,
-    pub sp: u16,
-    pub pc: u16,
-    pub ram: Vec<(u16, u8)>,
 }
 
 impl RegisterFile {
@@ -240,7 +224,7 @@ impl Cpu {
         self.bus.timer.tac = 0xF8;
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> usize {
         let icycles = self.handle_interrupts();
         if self.pending_ime {
             self.ime = true;
@@ -248,6 +232,7 @@ impl Cpu {
         }
         let cycles = icycles + self.execute_instruction();
         self.bus.tick(cycles);
+        cycles
     }
 
     fn handle_interrupts(&mut self) -> usize {

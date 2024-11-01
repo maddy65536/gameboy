@@ -24,7 +24,7 @@ impl Bus {
     }
 
     fn ram_read(&self, addr: u16) -> u8 {
-        return self.ram[addr as usize];
+        self.ram[addr as usize]
     }
 
     fn ram_write(&mut self, addr: u16, val: u8) {
