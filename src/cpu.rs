@@ -72,7 +72,7 @@ const HL_IND_REG_NUM: u8 = 0x6;
 #[derive(Debug)]
 pub struct Cpu {
     rf: RegisterFile,
-    bus: Bus,
+    pub bus: Bus,
     ime: bool,
     pending_ime: bool,
     halted: bool,

@@ -1,4 +1,5 @@
 use crate::cart::Cart;
+use crate::ppu::Ppu;
 use crate::timer::Timer;
 
 #[derive(Debug)]
@@ -6,6 +7,7 @@ pub struct Bus {
     pub ram: [u8; 0x10000], // just a flat array until i start the memory map stuff
     cart: Cart,
     pub timer: Timer,
+    pub ppu: Ppu,
 }
 
 impl Bus {
@@ -14,6 +16,7 @@ impl Bus {
             ram: [0; 0x10000],
             cart,
             timer: Timer::new(),
+            ppu: Ppu::new(),
         }
     }
 

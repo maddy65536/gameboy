@@ -5,7 +5,7 @@ use crate::{cart::Cart, cpu::Cpu};
 const CYCLES_PER_FRAME: usize = 4194300 / 60;
 
 pub struct Gameboy {
-    cpu: Cpu,
+    pub cpu: Cpu,
     cycles: usize,
 }
 
