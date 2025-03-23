@@ -1,9 +1,9 @@
 use eframe::egui::TextureOptions;
 use eframe::egui::{self, ColorImage};
-use eframe::egui::{widgets::Image, Color32, TextureHandle};
+use eframe::egui::{Color32, TextureHandle, widgets::Image};
 
-use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::Gameboy;
+use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 pub const GUI_SCALE: usize = 4;
 

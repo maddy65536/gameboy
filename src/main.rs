@@ -1,10 +1,10 @@
 use clap::Parser;
-use eframe::egui::ViewportBuilder;
 use eframe::NativeOptions;
+use eframe::egui::ViewportBuilder;
 
 use crate::gameboy::Gameboy;
-use crate::gui::Gui;
 use crate::gui::GUI_SCALE;
+use crate::gui::Gui;
 use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 mod bus;
