@@ -4,7 +4,7 @@ use eframe::NativeOptions;
 
 use crate::gameboy::Gameboy;
 use crate::gui::Gui;
-use crate::gui::SCALE;
+use crate::gui::GUI_SCALE;
 use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 mod bus;
@@ -26,8 +26,8 @@ fn main() {
     let gb = Gameboy::new(args.rom_path);
     let native_options = NativeOptions {
         viewport: ViewportBuilder::default().with_inner_size([
-            (SCREEN_WIDTH * SCALE) as f32,
-            (SCREEN_HEIGHT * SCALE) as f32,
+            (SCREEN_WIDTH * GUI_SCALE) as f32,
+            (SCREEN_HEIGHT * GUI_SCALE) as f32,
         ]),
         ..Default::default()
     };

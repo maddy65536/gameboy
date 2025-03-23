@@ -5,7 +5,7 @@ use eframe::egui::{widgets::Image, Color32, TextureHandle};
 use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::Gameboy;
 
-pub const SCALE: usize = 5;
+pub const GUI_SCALE: usize = 4;
 
 pub struct Gui {
     gb: Gameboy,
