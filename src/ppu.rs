@@ -26,10 +26,9 @@ pub enum Color {
     Black,
 }
 
-#[allow(clippy::from_over_into)] // this wouldn't make much sense the other way
-impl Into<Color32> for Color {
-    fn into(self) -> Color32 {
-        match self {
+impl From<Color> for Color32 {
+    fn from(value: Color) -> Self {
+        match value {
             Color::White => Color32::from_rgb(0xFF, 0xFF, 0xFF),
             Color::LightGrey => Color32::from_rgb(0xAA, 0xAA, 0xAA),
             Color::DarkGrey => Color32::from_rgb(0x55, 0x55, 0x55),

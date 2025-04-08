@@ -67,8 +67,6 @@ const CB_INSTRUCTION_TIMINGS: [usize; 256] = [
     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8,  16, 8,  // 0xF0
 ];
 
-const HL_IND_REG_NUM: u8 = 0x6;
-
 #[derive(Debug)]
 pub struct Cpu {
     rf: RegisterFile,
@@ -161,37 +159,6 @@ impl RegisterFile {
 
     pub fn read_c(&self) -> bool {
         ((self.f & (1 << 4)) >> 4) == 1
-    }
-}
-
-impl std::ops::Index<u8> for RegisterFile {
-    type Output = u8;
-    fn index(&self, index: u8) -> &Self::Output {
-        match index {
-            0 => &self.b,
-            1 => &self.c,
-            2 => &self.d,
-            3 => &self.e,
-            4 => &self.h,
-            5 => &self.l,
-            7 => &self.a,
-            _ => panic!("cannot convert {} to a register!", index),
-        }
-    }
-}
-
-impl std::ops::IndexMut<u8> for RegisterFile {
-    fn index_mut(&mut self, index: u8) -> &mut Self::Output {
-        match index {
-            0 => &mut self.b,
-            1 => &mut self.c,
-            2 => &mut self.d,
-            3 => &mut self.e,
-            4 => &mut self.h,
-            5 => &mut self.l,
-            7 => &mut self.a,
-            _ => panic!("cannot convert {} to a register!", index),
-        }
     }
 }
 
@@ -291,15 +258,29 @@ impl Cpu {
 
     fn write_r8(&mut self, reg: u8, val: u8) {
         match reg {
-            HL_IND_REG_NUM => self.write_hl_ind(val),
-            _ => self.rf[reg] = val,
+            0 => self.rf.b = val,
+            1 => self.rf.c = val,
+            2 => self.rf.d = val,
+            3 => self.rf.e = val,
+            4 => self.rf.h = val,
+            5 => self.rf.l = val,
+            6 => self.write_hl_ind(val),
+            7 => self.rf.a = val,
+            _ => panic!("tried to write to register {}?", reg),
         }
     }
 
     fn read_r8(&self, reg: u8) -> u8 {
         match reg {
-            HL_IND_REG_NUM => self.read_hl_ind(),
-            _ => self.rf[reg],
+            0 => self.rf.b,
+            1 => self.rf.c,
+            2 => self.rf.d,
+            3 => self.rf.e,
+            4 => self.rf.h,
+            5 => self.rf.l,
+            6 => self.read_hl_ind(),
+            7 => self.rf.a,
+            _ => panic!("tried to read from register {}?", reg),
         }
     }
 
