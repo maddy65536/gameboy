@@ -13,6 +13,8 @@ impl Cart {
         self.rom[addr as usize]
     }
 
+    // probably gonna deal with cartridges by using traits and this will be important then
+    #[allow(unused)]
     pub fn write_u8(&mut self, addr: u16) {
         unimplemented!("tried to write to cart")
     }

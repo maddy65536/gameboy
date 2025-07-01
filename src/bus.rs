@@ -72,6 +72,7 @@ impl Bus {
         match addr {
             0x0000..=0x3FFF => self.cart.read_u8(addr),
             0x4000..=0x7FFF => self.cart.read_u8(addr),
+            0x8000..=0x9FFF => self.ppu.read_u8(addr),
             0xC000..=0xCFFF => self.ram_read(addr),
             0xD000..=0xDFFF => self.ram_read(addr),
             0xFF00..=0xFF7F => self.io_read_u8(addr),
@@ -83,6 +84,7 @@ impl Bus {
 
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
+            0x8000..=0x9FFF => self.ppu.write_u8(addr, val),
             0xC000..=0xCFFF => self.ram_write(addr, val),
             0xD000..=0xDFFF => self.ram_write(addr, val),
             0xFF00..=0xFF7F => self.io_write_u8(addr, val),
@@ -149,6 +151,7 @@ impl Bus {
         match addr {
             0xFF01 => self.ram_read(addr), // serial data
             0xFF04..=0xFF07 => self.timer.read_u8(addr),
+            0xFF40..=0xFF4B => self.ppu.read_u8(addr),
             0xFF0F => self.ram_read(addr), // IF
             _ => 0,
         }
@@ -165,6 +168,7 @@ impl Bus {
                 }
             }
             0xFF04..=0xFF07 => self.timer.write_u8(addr, val),
+            0xFF40..=0xFF4B => self.ppu.write_u8(addr, val),
             0xFF0F => self.ram_write(addr, val), // IF
             _ => (),
         }
