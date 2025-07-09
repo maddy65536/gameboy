@@ -1,4 +1,5 @@
 use eframe::egui::Color32;
+use proc_bitfield::bitfield;
 
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
@@ -12,8 +13,8 @@ pub struct Ppu {
     cycles: usize,
 
     // just doing this for now
-    lcdc: u8,
-    stat: u8,
+    lcdc: Lcdc,
+    stat: Stat,
     scy: u8,
     scx: u8,
     ly: u8,
@@ -25,7 +26,7 @@ pub struct Ppu {
     wx: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PpuState {
     HBlank,
     OAMScan,
@@ -63,6 +64,32 @@ enum TilePixel {
 
 type Tile = [[TilePixel; 8]; 8];
 
+bitfield! {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct Lcdc(pub u8): Debug, FromStorage, IntoStorage, DerefStorage {
+        pub lcd_ppu_enable: bool @ 7,
+        pub window_tilemap: bool @ 6,
+        pub window_enable: bool @ 5,
+        pub bg_window_tiles: bool @ 4,
+        pub bg_tilemap: bool @ 3,
+        pub obj_size: bool @ 2,
+        pub obj_enable: bool @ 1,
+        pub bg_window_enable: bool @ 0,
+    }
+}
+
+bitfield! {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct Stat(pub u8): Debug, FromStorage, IntoStorage, DerefStorage {
+        pub lyc_int_select: bool @ 6,
+        pub mode_2_int_select: bool @ 5,
+        pub mode_1_int_select: bool @ 4,
+        pub mode_0_int_select: bool @ 3,
+        pub lyc_eq_ly: bool @ 2,
+        pub ppu_mode: u8 @ 0..=1,
+    }
+}
+
 impl Ppu {
     pub fn new() -> Self {
         let mut frame = [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT];
@@ -87,8 +114,8 @@ impl Ppu {
             frame,
             cycles: 0,
 
-            lcdc: 0,
-            stat: 0,
+            lcdc: 0.into(),
+            stat: 0.into(),
             scy: 0,
             scx: 0,
             ly: 0,
@@ -104,8 +131,8 @@ impl Ppu {
     pub fn read_u8(&self, addr: u16) -> u8 {
         match addr {
             0x8000..=0x9FFF => self.read_vram(addr),
-            0xFF40 => self.lcdc,
-            0xFF41 => self.stat,
+            0xFF40 => self.lcdc.into(),
+            0xFF41 => self.stat.into(),
             0xFF42 => self.scy,
             0xFF43 => self.scx,
             0xFF44 => self.ly,
@@ -122,11 +149,11 @@ impl Ppu {
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
             0x8000..=0x9FFF => self.write_vram(addr, val),
-            0xFF40 => self.lcdc = val,
-            0xFF41 => self.stat = val,
+            0xFF40 => self.lcdc = val.into(),
+            0xFF41 => self.stat = val.into(),
             0xFF42 => self.scy = val,
             0xFF43 => self.scx = val,
-            0xFF44 => self.ly = val,
+            0xFF44 => (), // can't write to ly, do nothing
             0xFF45 => self.lyc = val,
             0xFF47 => self.bgp = val,
             0xFF48 => self.obp0 = val,
@@ -171,6 +198,29 @@ impl Ppu {
 
             self.tileset[tile_index][row_index][pixel_index] = val;
         }
+    }
+
+    fn index_to_tile(&self, id: u8, from_upper: bool) -> &Tile {
+        if !from_upper {
+            // 0x8000 method
+            &self.tileset[id as usize]
+        } else {
+            // 0x8800 method
+            // i could do clever casting stuff here but i don't wanna!
+            if id <= 127 {
+                &self.tileset[(id as usize) + 256]
+            } else {
+                &self.tileset[id as usize]
+            }
+        }
+    }
+
+    fn get_tileid_1(&self, x: u8, y: u8) -> u8 {
+        self.vram[0x1800 + (x as usize) + (y as usize) * 32]
+    }
+
+    fn get_tileid_2(&self, x: u8, y: u8) -> u8 {
+        self.vram[0x1C00 + (x as usize) + (y as usize) * 32]
     }
 
     fn tick(&mut self, cycles: usize) {
