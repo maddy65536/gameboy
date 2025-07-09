@@ -151,7 +151,8 @@ impl Bus {
         match addr {
             0xFF01 => self.ram_read(addr), // serial data
             0xFF04..=0xFF07 => self.timer.read_u8(addr),
-            0xFF40..=0xFF4B => self.ppu.read_u8(addr),
+            0xFF46 => 0, // what does reading from the dma register do?
+            0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.read_u8(addr),
             0xFF0F => self.ram_read(addr), // IF
             _ => 0,
         }
@@ -168,9 +169,18 @@ impl Bus {
                 }
             }
             0xFF04..=0xFF07 => self.timer.write_u8(addr, val),
-            0xFF40..=0xFF4B => self.ppu.write_u8(addr, val),
+            0xFF46 => self.do_dma(val), // dma lives in the bus to make things easier
+            0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.write_u8(addr, val),
             0xFF0F => self.ram_write(addr, val), // IF
             _ => (),
+        }
+    }
+
+    // not that accurate but i'm just gonna trust roms to play nice
+    fn do_dma(&mut self, src: u8) {
+        let addr = (src as u16) << 8;
+        for i in 0..=0x9F {
+            self.write_u8(0xFE00 + i, self.read_u8(addr + i));
         }
     }
 }
