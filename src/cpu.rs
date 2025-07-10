@@ -213,7 +213,7 @@ impl Cpu {
 
         if i_flags & i_enable != 0 {
             if self.ime {
-                let int = i_flags.trailing_zeros(); // is this a clever way to do this? i hope so!
+                let int = (i_flags & i_enable).trailing_zeros(); // is this a clever way to do this? i hope so! (it wasn't i had to fix it)
                 let addr = match int {
                     0 => 0x0040, // VBlank
                     1 => 0x0048, // LCD
@@ -226,7 +226,7 @@ impl Cpu {
                 self.ime = false;
                 self.bus.write_u8(0xFF0F, i_flags & !(1 << int)); // update IF
                 self.push_u16(self.rf.pc);
-                self.rf.pc = addr
+                self.rf.pc = addr;
             }
 
             self.halted = false;

@@ -15,7 +15,6 @@ pub struct Ppu {
     pub stat_int: bool,
     pub vblank_int: bool,
 
-    // just doing this for now
     lcdc: Lcdc,
     stat: Stat,
     scy: u8,
@@ -27,6 +26,7 @@ pub struct Ppu {
     obp1: u8,
     wy: u8,
     wx: u8,
+    wly: u8, // for counting window lines
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -67,6 +67,16 @@ enum TilePixel {
 
 type Tile = [[TilePixel; 8]; 8];
 
+fn pixel_to_color(pixel: TilePixel, palette: u8) -> Color {
+    match (palette >> ((pixel as u8) << 1)) & 0x03 {
+        0 => Color::White,
+        1 => Color::LightGrey,
+        2 => Color::DarkGrey,
+        3 => Color::Black,
+        _ => unreachable!(),
+    }
+}
+
 bitfield! {
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub struct Lcdc(pub u8): Debug, FromStorage, IntoStorage, DerefStorage {
@@ -95,7 +105,7 @@ bitfield! {
 
 impl Ppu {
     pub fn new() -> Self {
-        let mut frame_buffer = [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT];
+        let frame_buffer = [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT];
 
         Self {
             state: PpuState::OAMScan,
@@ -107,7 +117,7 @@ impl Ppu {
             stat_int: false,
             vblank_int: false,
 
-            lcdc: 0.into(),
+            lcdc: 0b10100011.into(),
             stat: 0.into(),
             scy: 0,
             scx: 0,
@@ -118,6 +128,7 @@ impl Ppu {
             obp1: 0,
             wy: 0,
             wx: 0,
+            wly: 0,
         }
     }
 
@@ -142,14 +153,7 @@ impl Ppu {
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
             0x8000..=0x9FFF => self.write_vram(addr, val),
-            0xFF40 => {
-                self.lcdc = val.into();
-                // is this how it works?
-                if !self.lcdc.lcd_ppu_enable() {
-                    self.ly = 0;
-                    self.change_state(PpuState::OAMScan);
-                }
-            }
+            0xFF40 => self.lcdc = val.into(),
             0xFF41 => self.stat = val.into(),
             0xFF42 => self.scy = val,
             0xFF43 => self.scx = val,
@@ -161,6 +165,13 @@ impl Ppu {
             0xFF4A => self.wy = val,
             0xFF4B => self.wx = val,
             _ => unreachable!("tried to write to bad region of ppu"),
+        }
+    }
+
+    fn check_lyc(&mut self) {
+        self.stat.set_lyc_eq_ly(self.ly == self.lyc);
+        if self.ly == self.lyc && self.stat.lyc_int_select() {
+            self.stat_int = true;
         }
     }
 
@@ -189,7 +200,7 @@ impl Ppu {
             let lsb = b1 & mask;
             let msb = b2 & mask;
 
-            let val = match (lsb, msb) {
+            let val = match (msb, lsb) {
                 (0, 0) => TilePixel::Zero,
                 (0, _) => TilePixel::One,
                 (_, 0) => TilePixel::Two,
@@ -200,8 +211,8 @@ impl Ppu {
         }
     }
 
-    fn index_to_tile(&self, id: u8, from_upper: bool) -> &Tile {
-        if !from_upper {
+    fn index_to_tile(&self, id: u8, from_lower: bool) -> &Tile {
+        if from_lower {
             // 0x8000 method
             &self.tileset[id as usize]
         } else {
@@ -215,12 +226,12 @@ impl Ppu {
         }
     }
 
-    fn get_tileid_1(&self, x: u8, y: u8) -> u8 {
-        self.vram[0x1800 + (x as usize) + (y as usize) * 32]
-    }
-
-    fn get_tileid_2(&self, x: u8, y: u8) -> u8 {
-        self.vram[0x1C00 + (x as usize) + (y as usize) * 32]
+    fn get_tileid(&self, x: u8, y: u8, from_upper: bool) -> u8 {
+        if from_upper {
+            self.vram[0x1C00 + (x as usize) + (y as usize) * 32]
+        } else {
+            self.vram[0x1800 + (x as usize) + (y as usize) * 32]
+        }
     }
 
     pub fn tick(&mut self, cycles: usize) {
@@ -251,6 +262,7 @@ impl Ppu {
                     } else {
                         self.change_state(PpuState::OAMScan);
                     }
+                    self.check_lyc();
                 }
             }
             PpuState::VBlank => {
@@ -259,8 +271,10 @@ impl Ppu {
                     self.ly += 1;
                     if self.ly > 153 {
                         self.ly = 0;
+                        self.wly = 0; //reset window line counter
                         self.change_state(PpuState::OAMScan);
                     }
+                    self.check_lyc();
                 }
             }
         }
@@ -307,14 +321,63 @@ impl Ppu {
     }
 
     fn draw_line(&mut self) {
-        self.draw_bg();
-        self.draw_obj();
+        if self.lcdc.bg_window_enable() {
+            self.draw_bg();
+        }
+        if self.lcdc.obj_enable() {
+            self.draw_obj();
+        }
     }
 
     fn draw_bg(&mut self) {
-        // draw bg
+        let scroll_x = self.scx;
+        let scroll_y = self.scy;
+        let win_x = self.wx - 7;
+        let win_y = self.wy;
 
-        // draw window
+        let tileset = self.lcdc.bg_window_tiles();
+        let bg_tilemap = self.lcdc.bg_tilemap();
+        let win_tilemap = self.lcdc.window_tilemap();
+        let use_window = self.lcdc.window_enable() && self.ly >= win_y;
+
+        let mut pixel;
+        let mut window_rendered = false;
+
+        for line_x in 0..160 {
+            if use_window && (line_x >= win_x) {
+                // render window
+                window_rendered = true;
+                let x = line_x - win_x;
+                let map_x = x / 8;
+                let tile_x = x % 8;
+
+                let y = self.wly;
+                let map_y = y / 8;
+                let tile_y = y % 8;
+
+                let tile_id = self.get_tileid(map_x, map_y, win_tilemap);
+                let tile = self.index_to_tile(tile_id, tileset);
+                pixel = tile[tile_y as usize][tile_x as usize];
+            } else {
+                // render background
+                let x = line_x.wrapping_add(scroll_x);
+                let map_x = x / 8;
+                let tile_x = x % 8;
+
+                let y = self.ly.wrapping_add(scroll_y);
+                let map_y = y / 8;
+                let tile_y = y % 8;
+
+                let tile_id = self.get_tileid(map_x, map_y, bg_tilemap);
+                let tile = self.index_to_tile(tile_id, tileset);
+                pixel = tile[tile_y as usize][tile_x as usize];
+            }
+
+            self.frame_buffer[self.ly as usize][line_x as usize] = pixel_to_color(pixel, self.bgp);
+        }
+        if window_rendered {
+            self.wly += 1;
+        }
     }
 
     fn draw_obj(&mut self) {}
