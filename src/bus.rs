@@ -24,6 +24,12 @@ impl Bus {
         self.timer.tick(cycles);
         self.ram[0xFF0F] |= (self.timer.timer_int as u8) << 2;
         self.timer.timer_int = false;
+
+        self.ppu.tick(cycles);
+        self.ram[0xFF0F] |= (self.ppu.stat_int as u8) << 1;
+        self.ppu.stat_int = false;
+        self.ram[0xFF0F] |= self.ppu.vblank_int as u8;
+        self.ppu.vblank_int = false;
     }
 
     fn ram_read(&self, addr: u16) -> u8 {

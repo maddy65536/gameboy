@@ -10,7 +10,10 @@ pub struct Ppu {
     vram: [u8; 0x2000],
     tileset: [Tile; 384],
     pub frame: [[Color; SCREEN_WIDTH]; SCREEN_HEIGHT],
+    frame_buffer: [[Color; SCREEN_WIDTH]; SCREEN_HEIGHT],
     cycles: usize,
+    pub stat_int: bool,
+    pub vblank_int: bool,
 
     // just doing this for now
     lcdc: Lcdc,
@@ -28,10 +31,10 @@ pub struct Ppu {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum PpuState {
-    HBlank,
-    OAMScan,
-    Draw,
-    VBlank,
+    HBlank = 0,
+    VBlank = 1,
+    OAMScan = 2,
+    Draw = 3,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -92,27 +95,17 @@ bitfield! {
 
 impl Ppu {
     pub fn new() -> Self {
-        let mut frame = [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT];
-        frame[100][100] = Color::Black;
-        frame[101][100] = Color::Black;
-        frame[102][100] = Color::Black;
-        frame[100][104] = Color::Black;
-        frame[101][104] = Color::Black;
-        frame[102][104] = Color::Black;
-        frame[105][105] = Color::Black;
-        frame[106][104] = Color::Black;
-        frame[106][103] = Color::Black;
-        frame[105][102] = Color::Black;
-        frame[106][101] = Color::Black;
-        frame[106][100] = Color::Black;
-        frame[105][99] = Color::Black;
+        let mut frame_buffer = [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT];
 
         Self {
             state: PpuState::OAMScan,
             vram: [0; 0x2000],
             tileset: [[[TilePixel::Zero; 8]; 8]; 384],
-            frame,
+            frame: [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT],
+            frame_buffer,
             cycles: 0,
+            stat_int: false,
+            vblank_int: false,
 
             lcdc: 0.into(),
             stat: 0.into(),
@@ -149,7 +142,14 @@ impl Ppu {
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
             0x8000..=0x9FFF => self.write_vram(addr, val),
-            0xFF40 => self.lcdc = val.into(),
+            0xFF40 => {
+                self.lcdc = val.into();
+                // is this how it works?
+                if !self.lcdc.lcd_ppu_enable() {
+                    self.ly = 0;
+                    self.change_state(PpuState::OAMScan);
+                }
+            }
             0xFF41 => self.stat = val.into(),
             0xFF42 => self.scy = val,
             0xFF43 => self.scx = val,
@@ -223,13 +223,99 @@ impl Ppu {
         self.vram[0x1C00 + (x as usize) + (y as usize) * 32]
     }
 
-    fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: usize) {
+        if !self.lcdc.lcd_ppu_enable() {
+            return;
+        }
         self.cycles += cycles;
         match self.state {
-            PpuState::OAMScan => todo!("OAM scan"),
-            PpuState::Draw => todo!("draw"),
-            PpuState::HBlank => todo!("hblank"),
-            PpuState::VBlank => todo!("vblank"),
+            PpuState::OAMScan => {
+                if self.cycles >= 80 {
+                    self.cycles -= 80;
+                    self.change_state(PpuState::Draw);
+                }
+            }
+            PpuState::Draw => {
+                // technically variable but i don't care for now lol
+                if self.cycles >= 172 {
+                    self.cycles -= 172;
+                    self.change_state(PpuState::HBlank);
+                }
+            }
+            PpuState::HBlank => {
+                if self.cycles >= 204 {
+                    self.cycles -= 204;
+                    self.ly += 1;
+                    if self.ly == 144 {
+                        self.change_state(PpuState::VBlank);
+                    } else {
+                        self.change_state(PpuState::OAMScan);
+                    }
+                }
+            }
+            PpuState::VBlank => {
+                if self.cycles >= 456 {
+                    self.cycles -= 456;
+                    self.ly += 1;
+                    if self.ly > 153 {
+                        self.ly = 0;
+                        self.change_state(PpuState::OAMScan);
+                    }
+                }
+            }
         }
     }
+
+    fn change_state(&mut self, state: PpuState) {
+        match state {
+            PpuState::HBlank => {
+                self.draw_line();
+
+                self.state = PpuState::HBlank;
+                self.stat.set_ppu_mode(PpuState::HBlank as u8);
+
+                if self.stat.mode_0_int_select() {
+                    self.stat_int = true;
+                }
+            }
+            PpuState::VBlank => {
+                // move frame buffer onto application window and clear frame buffer
+                std::mem::swap(&mut self.frame, &mut self.frame_buffer);
+                self.frame_buffer.fill([Color::White; SCREEN_WIDTH]);
+
+                self.state = PpuState::VBlank;
+                self.stat.set_ppu_mode(PpuState::VBlank as u8);
+
+                self.vblank_int = true;
+                if self.stat.mode_1_int_select() {
+                    self.stat_int = true;
+                }
+            }
+            PpuState::OAMScan => {
+                self.state = PpuState::OAMScan;
+                self.stat.set_ppu_mode(PpuState::OAMScan as u8);
+
+                if self.stat.mode_2_int_select() {
+                    self.stat_int = true;
+                }
+            }
+            PpuState::Draw => {
+                self.state = PpuState::Draw;
+                self.stat.set_ppu_mode(PpuState::Draw as u8);
+            }
+        }
+    }
+
+    fn draw_line(&mut self) {
+        self.draw_bg();
+        self.draw_obj();
+    }
+
+    fn draw_bg(&mut self) {
+        // draw bg
+
+        // draw window
+    }
+
+    fn draw_obj(&mut self) {}
 }
