@@ -283,6 +283,7 @@ impl Ppu {
 
     pub fn tick(&mut self, cycles: usize) {
         if !self.lcdc.lcd_ppu_enable() {
+            self.stat.set_ppu_mode(0);
             return;
         }
         self.cycles += cycles;
