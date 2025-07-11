@@ -8,11 +8,11 @@ use crate::gui::Gui;
 use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 mod bus;
-mod cart;
 mod cpu;
 mod gameboy;
 mod gui;
 mod joypad;
+mod mbc;
 mod ppu;
 mod timer;
 

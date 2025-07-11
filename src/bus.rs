@@ -1,19 +1,19 @@
-use crate::cart::Cart;
 use crate::joypad::Joypad;
+use crate::mbc::Cart;
 use crate::ppu::Ppu;
 use crate::timer::Timer;
 
 #[derive(Debug)]
 pub struct Bus {
     pub ram: [u8; 0x10000], // just a flat array until i start the memory map stuff
-    cart: Cart,
+    cart: Box<dyn Cart>,
     pub timer: Timer,
     pub ppu: Ppu,
     pub joypad: Joypad,
 }
 
 impl Bus {
-    pub fn new(cart: Cart) -> Self {
+    pub fn new(cart: Box<dyn Cart>) -> Self {
         Bus {
             ram: [0; 0x10000],
             cart,
