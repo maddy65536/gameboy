@@ -1,4 +1,5 @@
 use crate::cart::Cart;
+use crate::joypad::Joypad;
 use crate::ppu::Ppu;
 use crate::timer::Timer;
 
@@ -8,6 +9,7 @@ pub struct Bus {
     cart: Cart,
     pub timer: Timer,
     pub ppu: Ppu,
+    pub joypad: Joypad,
 }
 
 impl Bus {
@@ -17,10 +19,15 @@ impl Bus {
             cart,
             timer: Timer::new(),
             ppu: Ppu::new(),
+            joypad: Joypad::new(),
         }
     }
 
     pub fn tick(&mut self, cycles: usize) {
+        self.joypad.tick();
+        self.ram[0xFF0F] |= (self.joypad.joypad_int as u8) << 4;
+        self.joypad.joypad_int = false;
+
         self.timer.tick(cycles);
         self.ram[0xFF0F] |= (self.timer.timer_int as u8) << 2;
         self.timer.timer_int = false;
@@ -157,7 +164,8 @@ impl Bus {
 
     fn io_read_u8(&self, addr: u16) -> u8 {
         match addr {
-            0xFF01 => self.ram_read(addr), // serial data
+            0xFF00 => self.joypad.read_u8(), // joypad
+            0xFF01 => self.ram_read(addr),   // serial data
             0xFF04..=0xFF07 => self.timer.read_u8(addr),
             0xFF46 => 0, // what does reading from the dma register do?
             0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.read_u8(addr),
@@ -168,6 +176,7 @@ impl Bus {
 
     fn io_write_u8(&mut self, addr: u16, val: u8) {
         match addr {
+            0xFF00 => self.joypad.write_u8(val), // joypad
             0xFF01 => self.ram_write(addr, val), // serial data
             0xFF02 => {
                 if val == 0x81 {

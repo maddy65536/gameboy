@@ -9,6 +9,18 @@ pub struct Gameboy {
     cycles: usize,
 }
 
+#[derive(Debug)]
+pub enum GbBtn {
+    Up,
+    Down,
+    Left,
+    Right,
+    A,
+    B,
+    Select,
+    Start,
+}
+
 impl Gameboy {
     pub fn new(rom_path: String) -> Self {
         let rom: Vec<u8> = fs::read(rom_path).unwrap();
@@ -24,5 +36,18 @@ impl Gameboy {
             self.cycles += cycles;
         }
         self.cycles -= CYCLES_PER_FRAME;
+    }
+
+    pub fn set_button(&mut self, button: GbBtn, down: bool) {
+        match button {
+            GbBtn::Up => self.cpu.bus.joypad.up = down,
+            GbBtn::Down => self.cpu.bus.joypad.down = down,
+            GbBtn::Left => self.cpu.bus.joypad.left = down,
+            GbBtn::Right => self.cpu.bus.joypad.right = down,
+            GbBtn::A => self.cpu.bus.joypad.a = down,
+            GbBtn::B => self.cpu.bus.joypad.b = down,
+            GbBtn::Select => self.cpu.bus.joypad.select = down,
+            GbBtn::Start => self.cpu.bus.joypad.start = down,
+        }
     }
 }

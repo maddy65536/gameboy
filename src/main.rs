@@ -12,6 +12,7 @@ mod cart;
 mod cpu;
 mod gameboy;
 mod gui;
+mod joypad;
 mod ppu;
 mod timer;
 
@@ -29,6 +30,7 @@ fn main() {
             (SCREEN_WIDTH * GUI_SCALE) as f32,
             (SCREEN_HEIGHT * GUI_SCALE) as f32,
         ]),
+        vsync: true,
         ..Default::default()
     };
     let _ = eframe::run_native(
