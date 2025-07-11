@@ -76,26 +76,28 @@ impl Bus {
 
     pub fn read_u8(&self, addr: u16) -> u8 {
         match addr {
-            0x0000..=0x3FFF => self.cart.read_u8(addr),
-            0x4000..=0x7FFF => self.cart.read_u8(addr),
-            0x8000..=0x9FFF => self.ppu.read_u8(addr),
+            0x0000..=0x3FFF => self.cart.read_u8(addr), // cart rom bank 0
+            0x4000..=0x7FFF => self.cart.read_u8(addr), // cart rom bank 01-NN
+            0x8000..=0x9FFF => self.ppu.read_u8(addr),  // VRAM
             0xC000..=0xCFFF => self.ram_read(addr),
             0xD000..=0xDFFF => self.ram_read(addr),
-            0xFF00..=0xFF7F => self.io_read_u8(addr),
-            0xFF80..=0xFFFE => self.ram_read(addr), // HRAM
-            0xFFFF => self.ram_read(addr),          // IE
+            0xFE00..=0xFE9F => self.ppu.read_u8(addr), // OAM
+            0xFF00..=0xFF7F => self.io_read_u8(addr),  // IO
+            0xFF80..=0xFFFE => self.ram_read(addr),    // HRAM
+            0xFFFF => self.ram_read(addr),             // IE
             _ => self.ram_read(addr),
         }
     }
 
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
-            0x8000..=0x9FFF => self.ppu.write_u8(addr, val),
+            0x8000..=0x9FFF => self.ppu.write_u8(addr, val), // VRAM
             0xC000..=0xCFFF => self.ram_write(addr, val),
             0xD000..=0xDFFF => self.ram_write(addr, val),
-            0xFF00..=0xFF7F => self.io_write_u8(addr, val),
-            0xFF80..=0xFFFE => self.ram_write(addr, val), // HRAM
-            0xFFFF => self.ram_write(addr, val),          // IE
+            0xFE00..=0xFE9F => self.ppu.write_u8(addr, val), // OAM
+            0xFF00..=0xFF7F => self.io_write_u8(addr, val),  // IO
+            0xFF80..=0xFFFE => self.ram_write(addr, val),    // HRAM
+            0xFFFF => self.ram_write(addr, val),             // IE
             _ => self.ram_write(addr, val),
         }
     }
@@ -171,7 +173,7 @@ impl Bus {
                 if val == 0x81 {
                     print!("{}", self.ram[0xFF01] as char)
                 } else {
-                    unimplemented!("tried something weird with serial, wrote {:#04X}", val)
+                    self.ram_write(addr, val);
                 }
             }
             0xFF04..=0xFF07 => self.timer.write_u8(addr, val),

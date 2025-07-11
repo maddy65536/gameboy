@@ -9,6 +9,8 @@ pub struct Ppu {
     state: PpuState,
     vram: [u8; 0x2000],
     tileset: [Tile; 384],
+    oam: [u8; 0xA0],
+    objects: [Object; 40],
     pub frame: [[Color; SCREEN_WIDTH]; SCREEN_HEIGHT],
     frame_buffer: [[Color; SCREEN_WIDTH]; SCREEN_HEIGHT],
     cycles: usize,
@@ -37,7 +39,7 @@ pub enum PpuState {
     Draw = 3,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     White,
     LightGrey,
@@ -57,7 +59,7 @@ impl From<Color> for Color32 {
 }
 
 // tileset cache based on https://rylev.github.io/DMG-01/public/book/graphics/tile_ram.html
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TilePixel {
     Zero,
     One,
@@ -66,6 +68,14 @@ enum TilePixel {
 }
 
 type Tile = [[TilePixel; 8]; 8];
+
+#[derive(Debug, Clone, Copy)]
+struct Object {
+    y: u8,
+    x: u8,
+    tile: u8,
+    flags: ObjFlags,
+}
 
 fn pixel_to_color(pixel: TilePixel, palette: u8) -> Color {
     match (palette >> ((pixel as u8) << 1)) & 0x03 {
@@ -103,16 +113,35 @@ bitfield! {
     }
 }
 
+bitfield! {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct ObjFlags(pub u8): Debug, FromStorage, IntoStorage, DerefStorage {
+        pub priority: bool @ 7,
+        pub y_flip: bool @ 6,
+        pub x_flip: bool @ 5,
+        pub dmg_palette: bool @ 4,
+        pub bank: bool @ 3, // CGB only
+        pub cgb_palette: u8 @ 0..=2, // CBG only
+    }
+}
+
 impl Ppu {
     pub fn new() -> Self {
-        let frame_buffer = [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT];
+        let obj_flags: ObjFlags = 0.into();
 
         Self {
             state: PpuState::OAMScan,
             vram: [0; 0x2000],
             tileset: [[[TilePixel::Zero; 8]; 8]; 384],
+            oam: [0; 0xA0],
+            objects: [Object {
+                y: 0,
+                x: 0,
+                tile: 0,
+                flags: 0.into(),
+            }; 40],
             frame: [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT],
-            frame_buffer,
+            frame_buffer: [[Color::White; SCREEN_WIDTH]; SCREEN_HEIGHT],
             cycles: 0,
             stat_int: false,
             vblank_int: false,
@@ -135,6 +164,7 @@ impl Ppu {
     pub fn read_u8(&self, addr: u16) -> u8 {
         match addr {
             0x8000..=0x9FFF => self.read_vram(addr),
+            0xFE00..=0xFE9F => self.read_oam(addr),
             0xFF40 => self.lcdc.into(),
             0xFF41 => self.stat.into(),
             0xFF42 => self.scy,
@@ -153,6 +183,7 @@ impl Ppu {
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
             0x8000..=0x9FFF => self.write_vram(addr, val),
+            0xFE00..=0xFE9F => self.write_oam(addr, val),
             0xFF40 => self.lcdc = val.into(),
             0xFF41 => self.stat = val.into(),
             0xFF42 => self.scy = val,
@@ -211,6 +242,24 @@ impl Ppu {
         }
     }
 
+    fn read_oam(&self, addr: u16) -> u8 {
+        self.oam[(addr - 0xFE00) as usize]
+    }
+
+    fn write_oam(&mut self, addr: u16, val: u8) {
+        let index = (addr - 0xFE00) as usize;
+        self.oam[index] = val;
+
+        let obj_index = index / 4;
+        match index % 4 {
+            0 => self.objects[obj_index].y = val,
+            1 => self.objects[obj_index].x = val,
+            2 => self.objects[obj_index].tile = val,
+            3 => self.objects[obj_index].flags = val.into(),
+            _ => unreachable!(),
+        }
+    }
+
     fn index_to_tile(&self, id: u8, from_lower: bool) -> &Tile {
         if from_lower {
             // 0x8000 method
@@ -257,7 +306,7 @@ impl Ppu {
                 if self.cycles >= 204 {
                     self.cycles -= 204;
                     self.ly += 1;
-                    if self.ly == 144 {
+                    if self.ly >= 144 {
                         self.change_state(PpuState::VBlank);
                     } else {
                         self.change_state(PpuState::OAMScan);
@@ -332,7 +381,7 @@ impl Ppu {
     fn draw_bg(&mut self) {
         let scroll_x = self.scx;
         let scroll_y = self.scy;
-        let win_x = self.wx - 7;
+        let win_x = self.wx.wrapping_sub(7);
         let win_y = self.wy;
 
         let tileset = self.lcdc.bg_window_tiles();
@@ -380,5 +429,84 @@ impl Ppu {
         }
     }
 
-    fn draw_obj(&mut self) {}
+    fn draw_obj(&mut self) {
+        let ly = self.ly as i16; // makes the math easier
+        let obj_height = if self.lcdc.obj_size() { 16 } else { 8 };
+
+        // objects to be rendered on this line, max 10
+        let mut line_objs: Vec<&Object> = vec![];
+        for obj in self.objects.iter() {
+            let obj_y = (obj.y as i16) - 16;
+            if ly >= obj_y && ly < obj_y + obj_height {
+                line_objs.push(obj);
+                if line_objs.len() >= 10 {
+                    break;
+                }
+            }
+        }
+
+        for line_x in 0..160 {
+            // find object to draw
+            let mut curr_obj: Option<&Object> = None;
+            for obj in line_objs.iter() {
+                let obj_x = (obj.x as i16) - 8;
+                if line_x >= obj_x && line_x < obj_x + 8 {
+                    if let Some(curr) = curr_obj {
+                        if obj.x < curr.x {
+                            curr_obj = Some(obj);
+                        }
+                    } else {
+                        curr_obj = Some(obj);
+                    }
+                }
+            }
+
+            // draw object if there is one
+            if let Some(obj) = curr_obj {
+                // only draw if the background isn't over it (i think?)
+                let should_draw = if !obj.flags.priority() {
+                    true
+                } else {
+                    self.frame_buffer[self.ly as usize][line_x as usize] == Color::White
+                };
+                if should_draw {
+                    let obj_x = (obj.x as i16) - 8;
+                    let obj_y = (obj.y as i16) - 16;
+                    let mut tile_x = line_x - obj_x;
+                    let mut tile_y = ly - obj_y;
+
+                    // flip tile if necessary
+                    if obj.flags.x_flip() {
+                        tile_x = 7 - tile_x;
+                    }
+                    if obj.flags.y_flip() {
+                        tile_y = (obj_height - 1) - tile_y;
+                    }
+
+                    let tile = if self.lcdc.obj_size() {
+                        let tile_ind = obj.tile & !1;
+                        if tile_y > 7 {
+                            tile_y -= 8;
+                            self.index_to_tile(tile_ind + 1, true)
+                        } else {
+                            self.index_to_tile(tile_ind, true)
+                        }
+                    } else {
+                        self.index_to_tile(obj.tile, true)
+                    };
+
+                    let pixel = tile[tile_y as usize][tile_x as usize];
+                    let palette = if obj.flags.dmg_palette() {
+                        self.obp1
+                    } else {
+                        self.obp0
+                    };
+                    if pixel != TilePixel::Zero {
+                        self.frame_buffer[self.ly as usize][line_x as usize] =
+                            pixel_to_color(pixel, palette);
+                    }
+                }
+            }
+        }
+    }
 }
