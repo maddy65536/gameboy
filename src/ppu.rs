@@ -127,8 +127,6 @@ bitfield! {
 
 impl Ppu {
     pub fn new() -> Self {
-        let obj_flags: ObjFlags = 0.into();
-
         Self {
             state: PpuState::OAMScan,
             vram: [0; 0x2000],
