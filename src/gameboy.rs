@@ -1,6 +1,10 @@
 use std::fs;
 
-use crate::{cpu::Cpu, mbc::create_cart};
+use crate::{
+    cpu::Cpu,
+    mbc::create_cart,
+    ppu::{Color, SCREEN_HEIGHT, SCREEN_WIDTH},
+};
 
 const CYCLES_PER_FRAME: usize = 4194300 / 60;
 
@@ -49,5 +53,9 @@ impl Gameboy {
             GbBtn::Select => self.cpu.bus.joypad.select = down,
             GbBtn::Start => self.cpu.bus.joypad.start = down,
         }
+    }
+
+    pub fn get_frame(&self) -> &[[Color; SCREEN_WIDTH]; SCREEN_HEIGHT] {
+        &self.cpu.bus.ppu.frame
     }
 }

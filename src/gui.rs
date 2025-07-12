@@ -31,9 +31,10 @@ impl Gui {
 
     fn update_screen(&mut self) {
         let mut pixels = vec![Color32::WHITE; SCREEN_WIDTH * SCREEN_HEIGHT];
+        let frame = self.gb.get_frame();
         for y in 0..SCREEN_HEIGHT {
             for x in 0..SCREEN_WIDTH {
-                pixels[y * SCREEN_WIDTH + x] = self.gb.cpu.bus.ppu.frame[y][x].into();
+                pixels[y * SCREEN_WIDTH + x] = frame[y][x].into();
             }
         }
 
