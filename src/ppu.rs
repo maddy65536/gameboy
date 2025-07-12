@@ -457,13 +457,10 @@ impl Ppu {
 
             // draw object if there is one
             if let Some(obj) = curr_obj {
-                // only draw if the background isn't over it (i think?)
-                let should_draw = if !obj.flags.priority() {
-                    true
-                } else {
-                    self.frame_buffer[self.ly as usize][line_x as usize] == Color::White
-                };
-                if should_draw {
+                // only draw if it's not set to priority or if it can draw when set to priority
+                if !obj.flags.priority()
+                    || self.frame_buffer[self.ly as usize][line_x as usize] == Color::White
+                {
                     let obj_x = (obj.x as i16) - 8;
                     let obj_y = (obj.y as i16) - 16;
                     let mut tile_x = line_x - obj_x;
