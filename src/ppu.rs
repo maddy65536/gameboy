@@ -197,7 +197,8 @@ impl Ppu {
         }
     }
 
-    fn check_lyc(&mut self) {
+    fn set_ly(&mut self, val: u8) {
+        self.ly = val;
         self.stat.set_lyc_eq_ly(self.ly == self.lyc);
         if self.ly == self.lyc && self.stat.lyc_int_select() {
             self.stat_int = true;
@@ -304,25 +305,23 @@ impl Ppu {
             PpuState::HBlank => {
                 if self.cycles >= 204 {
                     self.cycles -= 204;
-                    self.ly += 1;
+                    self.set_ly(self.ly + 1);
                     if self.ly >= 144 {
                         self.change_state(PpuState::VBlank);
                     } else {
                         self.change_state(PpuState::OAMScan);
                     }
-                    self.check_lyc();
                 }
             }
             PpuState::VBlank => {
                 if self.cycles >= 456 {
                     self.cycles -= 456;
-                    self.ly += 1;
+                    self.set_ly(self.ly + 1);
                     if self.ly > 153 {
-                        self.ly = 0;
+                        self.set_ly(0);
                         self.wly = 0; //reset window line counter
                         self.change_state(PpuState::OAMScan);
                     }
-                    self.check_lyc();
                 }
             }
         }
@@ -342,7 +341,7 @@ impl Ppu {
             }
             PpuState::VBlank => {
                 // move frame buffer onto application window and clear frame buffer
-                std::mem::swap(&mut self.frame, &mut self.frame_buffer);
+                std::mem::swap(&mut self.frame, &mut self.frame_buffer); // does this swap pointers?
                 self.frame_buffer.fill([Color::White; SCREEN_WIDTH]);
 
                 self.state = PpuState::VBlank;
@@ -392,35 +391,31 @@ impl Ppu {
         let mut window_rendered = false;
 
         for line_x in 0..160 {
+            let x;
+            let y;
+            let tilemap;
+
             if use_window && (line_x >= win_x) {
                 // render window
                 window_rendered = true;
-                let x = line_x - win_x;
-                let map_x = x / 8;
-                let tile_x = x % 8;
-
-                let y = self.wly;
-                let map_y = y / 8;
-                let tile_y = y % 8;
-
-                let tile_id = self.get_tileid(map_x, map_y, win_tilemap);
-                let tile = self.index_to_tile(tile_id, tileset);
-                pixel = tile[tile_y as usize][tile_x as usize];
+                x = line_x - win_x;
+                y = self.wly;
+                tilemap = win_tilemap;
             } else {
                 // render background
-                let x = line_x.wrapping_add(scroll_x);
-                let map_x = x / 8;
-                let tile_x = x % 8;
-
-                let y = self.ly.wrapping_add(scroll_y);
-                let map_y = y / 8;
-                let tile_y = y % 8;
-
-                let tile_id = self.get_tileid(map_x, map_y, bg_tilemap);
-                let tile = self.index_to_tile(tile_id, tileset);
-                pixel = tile[tile_y as usize][tile_x as usize];
+                x = line_x.wrapping_add(scroll_x);
+                y = self.ly.wrapping_add(scroll_y);
+                tilemap = bg_tilemap;
             }
 
+            let map_x = x / 8;
+            let tile_x = x % 8;
+            let map_y = y / 8;
+            let tile_y = y % 8;
+
+            let tile_id = self.get_tileid(map_x, map_y, tilemap);
+            let tile = self.index_to_tile(tile_id, tileset);
+            pixel = tile[tile_y as usize][tile_x as usize];
             self.frame_buffer[self.ly as usize][line_x as usize] = pixel_to_color(pixel, self.bgp);
         }
         if window_rendered {
