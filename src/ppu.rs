@@ -448,23 +448,21 @@ impl Ppu {
         }
 
         for line_x in 0..160 {
-            // find object to draw
-            let mut curr_obj: Option<&Object> = None;
+            // find list of objects to try drawing
+            let mut obj_list = vec![];
             for obj in line_objs.iter() {
                 let obj_x = (obj.x as i16) - 8;
                 if line_x >= obj_x && line_x < obj_x + 8 {
-                    if let Some(curr) = curr_obj {
-                        if obj.x < curr.x {
-                            curr_obj = Some(obj);
-                        }
-                    } else {
-                        curr_obj = Some(obj);
-                    }
+                    obj_list.push(*obj);
                 }
             }
 
+            obj_list.sort_by_key(|o| o.x);
+            let mut pixel = TilePixel::Zero;
+            let mut palette = 0;
+
             // draw object if there is one
-            if let Some(obj) = curr_obj {
+            for obj in obj_list {
                 // only draw if it's not set to priority or if it can draw when set to priority
                 if !obj.flags.priority()
                     || self.frame_buffer[self.ly as usize][line_x as usize] == Color::White
@@ -494,17 +492,22 @@ impl Ppu {
                         self.index_to_tile(obj.tile, true)
                     };
 
-                    let pixel = tile[tile_y as usize][tile_x as usize];
-                    let palette = if obj.flags.dmg_palette() {
+                    palette = if obj.flags.dmg_palette() {
                         self.obp1
                     } else {
                         self.obp0
                     };
+
+                    pixel = tile[tile_y as usize][tile_x as usize];
                     if pixel != TilePixel::Zero {
-                        self.frame_buffer[self.ly as usize][line_x as usize] =
-                            pixel_to_color(pixel, palette);
+                        break;
                     }
                 }
+            }
+
+            if pixel != TilePixel::Zero {
+                self.frame_buffer[self.ly as usize][line_x as usize] =
+                    pixel_to_color(pixel, palette);
             }
         }
     }
