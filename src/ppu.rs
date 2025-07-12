@@ -187,7 +187,7 @@ impl Ppu {
             0xFF42 => self.scy = val,
             0xFF43 => self.scx = val,
             0xFF44 => (), // can't write to ly, do nothing
-            0xFF45 => self.lyc = val,
+            0xFF45 => self.set_lyc(val),
             0xFF47 => self.bgp = val,
             0xFF48 => self.obp0 = val,
             0xFF49 => self.obp1 = val,
@@ -199,6 +199,14 @@ impl Ppu {
 
     fn set_ly(&mut self, val: u8) {
         self.ly = val;
+        self.stat.set_lyc_eq_ly(self.ly == self.lyc);
+        if self.ly == self.lyc && self.stat.lyc_int_select() {
+            self.stat_int = true;
+        }
+    }
+
+    fn set_lyc(&mut self, val: u8) {
+        self.lyc = val;
         self.stat.set_lyc_eq_ly(self.ly == self.lyc);
         if self.ly == self.lyc && self.stat.lyc_int_select() {
             self.stat_int = true;
