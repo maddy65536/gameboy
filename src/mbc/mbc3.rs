@@ -1,4 +1,4 @@
-use crate::mbc::{Mbc, ram_size, rom_size};
+use crate::mbc::{Mbc, ram_size};
 
 // no timer implementation
 
@@ -6,7 +6,6 @@ use crate::mbc::{Mbc, ram_size, rom_size};
 pub struct Mbc3 {
     rom: Vec<u8>,
     ram: Vec<u8>,
-    num_rom_banks: usize,
     num_ram_banks: usize,
     ram_bank: usize,
     rom_bank: usize,
@@ -17,11 +16,9 @@ pub struct Mbc3 {
 impl Mbc3 {
     pub fn new(rom: Vec<u8>, has_battery: bool) -> Self {
         let ram_size = ram_size(&rom);
-        let rom_size = rom_size(&rom);
         Self {
             rom,
             ram: std::iter::repeat_n(0, ram_size).collect(),
-            num_rom_banks: rom_size / 16384,
             num_ram_banks: ram_size / 16384,
             ram_bank: 0,
             rom_bank: 0,
