@@ -1,6 +1,7 @@
 use crate::joypad::Joypad;
 use crate::mbc::Cart;
 use crate::ppu::Ppu;
+use crate::serial::Serial;
 use crate::timer::Timer;
 
 #[derive(Debug)]
@@ -10,6 +11,7 @@ pub struct Bus {
     pub timer: Timer,
     pub ppu: Ppu,
     pub joypad: Joypad,
+    serial: Serial,
 }
 
 impl Bus {
@@ -20,6 +22,7 @@ impl Bus {
             timer: Timer::new(),
             ppu: Ppu::new(),
             joypad: Joypad::new(),
+            serial: Serial::new(),
         }
     }
 
@@ -27,6 +30,10 @@ impl Bus {
         self.joypad.tick();
         self.ram[0xFF0F] |= (self.joypad.joypad_int as u8) << 4;
         self.joypad.joypad_int = false;
+
+        self.serial.tick(cycles);
+        self.ram[0xFF0F] |= (self.serial.serial_int as u8) << 3;
+        self.serial.serial_int = false;
 
         self.timer.tick(cycles);
         self.ram[0xFF0F] |= (self.timer.timer_int as u8) << 2;
@@ -164,8 +171,8 @@ impl Bus {
 
     fn io_read_u8(&self, addr: u16) -> u8 {
         match addr {
-            0xFF00 => self.joypad.read_u8(), // joypad
-            0xFF01 => self.ram_read(addr),   // serial data
+            0xFF00 => self.joypad.read_u8(),              // joypad
+            0xFF01 | 0xFF02 => self.serial.read_u8(addr), // serial data
             0xFF04..=0xFF07 => self.timer.read_u8(addr),
             0xFF46 => 0, // what does reading from the dma register do?
             0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.read_u8(addr),
@@ -176,15 +183,8 @@ impl Bus {
 
     fn io_write_u8(&mut self, addr: u16, val: u8) {
         match addr {
-            0xFF00 => self.joypad.write_u8(val), // joypad
-            0xFF01 => self.ram_write(addr, val), // serial data
-            0xFF02 => {
-                if val == 0x81 {
-                    print!("{}", self.ram[0xFF01] as char)
-                } else {
-                    self.ram_write(addr, val);
-                }
-            }
+            0xFF00 => self.joypad.write_u8(val),                // joypad
+            0xFF01 | 0xFF02 => self.serial.write_u8(addr, val), // serial data
             0xFF04..=0xFF07 => self.timer.write_u8(addr, val),
             0xFF46 => self.do_dma(val), // dma lives in the bus to make things easier
             0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.write_u8(addr, val),

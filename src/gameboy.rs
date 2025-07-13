@@ -6,7 +6,8 @@ use crate::{
     ppu::{Color, SCREEN_HEIGHT, SCREEN_WIDTH},
 };
 
-const CYCLES_PER_FRAME: usize = 4194300 / 60;
+pub const CLOCK_SPEED: usize = 4194300;
+const CYCLES_PER_FRAME: usize = CLOCK_SPEED / 60;
 
 pub struct Gameboy {
     pub cpu: Cpu,

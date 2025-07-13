@@ -14,6 +14,7 @@ mod gui;
 mod joypad;
 mod mbc;
 mod ppu;
+mod serial;
 mod timer;
 
 #[derive(Debug, Parser)]
