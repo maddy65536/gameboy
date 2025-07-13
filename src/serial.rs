@@ -2,7 +2,7 @@ use proc_bitfield::bitfield;
 
 use crate::gameboy::CLOCK_SPEED;
 
-const UPDATE_FREQ: usize = CLOCK_SPEED / 8192;
+const UPDATE_FREQ: u64 = CLOCK_SPEED / 8192;
 
 // this is just a stub, maybe i'll fill it out eventually
 #[derive(Debug)]
@@ -10,7 +10,7 @@ pub struct Serial {
     pub sb: u8,
     pub sc: Sc,
     pub serial_int: bool,
-    cycles: usize,
+    cycles: u64,
     bit_counter: u8,
 }
 
@@ -34,7 +34,7 @@ impl Serial {
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: u64) {
         if !self.sc.clock_select() || !self.sc.transfer_enable() {
             return;
         }

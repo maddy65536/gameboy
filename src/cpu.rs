@@ -3,7 +3,7 @@ use crate::mbc::Cart;
 
 // instruction timings in T-cycles
 #[rustfmt::skip]
-const INSTRUCTION_TIMINGS: [usize; 256] = [
+const INSTRUCTION_TIMINGS: [u64; 256] = [
 // +0  +1  +2  +3  +4  +5  +6  +7  +8  +9  +A  +B  +C  +D  +E  +F
     4,  12, 8,  8,  4,  4,  8,  4,  20, 8,  8,  8,  4,  4,  8,  4,  // 0x00
     4,  12, 8,  8,  4,  4,  8,  4,  12, 8,  8,  8,  4,  4,  8,  4,  // 0x10
@@ -25,7 +25,7 @@ const INSTRUCTION_TIMINGS: [usize; 256] = [
 
 // insturction timings with branch in T-cycles
 #[rustfmt::skip]
-const INSTRUCTION_TIMINGS_BRANCH: [usize; 256] = [
+const INSTRUCTION_TIMINGS_BRANCH: [u64; 256] = [
 // +0  +1  +2  +3  +4  +5  +6  +7  +8  +9  +A  +B  +C  +D  +E  +F
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x00
     0,  0,  0,  0,  0,  0,  0,  0,  12, 0,  0,  0,  0,  0,  0,  0,  // 0x10
@@ -47,7 +47,7 @@ const INSTRUCTION_TIMINGS_BRANCH: [usize; 256] = [
 
 // CB prefixed instruction timings in T-cycles
 #[rustfmt::skip]
-const CB_INSTRUCTION_TIMINGS: [usize; 256] = [
+const CB_INSTRUCTION_TIMINGS: [u64; 256] = [
 // +0  +1  +2  +3  +4  +5  +6  +7  +8  +9  +A  +B  +C  +D  +E  +F
     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8,  16, 8,  // 0x00
     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8,  16, 8,  // 0x10
@@ -191,7 +191,7 @@ impl Cpu {
         self.bus.timer.tac = 0xF8;
     }
 
-    pub fn tick(&mut self) -> usize {
+    pub fn tick(&mut self) -> u64 {
         let icycles = self.handle_interrupts();
         if self.pending_ime {
             self.ime = true;
@@ -202,7 +202,7 @@ impl Cpu {
         cycles
     }
 
-    fn handle_interrupts(&mut self) -> usize {
+    fn handle_interrupts(&mut self) -> u64 {
         if self.pending_ime {
             self.ime = true;
             self.pending_ime = false;
@@ -295,7 +295,7 @@ impl Cpu {
         val
     }
 
-    pub fn execute_instruction(&mut self) -> usize {
+    pub fn execute_instruction(&mut self) -> u64 {
         if self.halted {
             return 4;
         }
@@ -360,7 +360,7 @@ impl Cpu {
         INSTRUCTION_TIMINGS[opcode as usize]
     }
 
-    fn cb_execute_instruction(&mut self) -> usize {
+    fn cb_execute_instruction(&mut self) -> u64 {
         let opcode = self.fetch_u8();
 
         match opcode {
@@ -805,7 +805,7 @@ impl Cpu {
     }
 
     // branches
-    fn jr(&mut self, opcode: u8) -> usize {
+    fn jr(&mut self, opcode: u8) -> u64 {
         let offset = self.fetch_u8() as i8;
         let cond = match opcode {
             0x18 => true,
@@ -823,7 +823,7 @@ impl Cpu {
         }
     }
 
-    fn ret(&mut self, opcode: u8) -> usize {
+    fn ret(&mut self, opcode: u8) -> u64 {
         let cond = match opcode {
             0xC0 => !self.rf.read_z(),
             0xD0 => !self.rf.read_c(),
@@ -845,7 +845,7 @@ impl Cpu {
         }
     }
 
-    fn jp(&mut self, opcode: u8) -> usize {
+    fn jp(&mut self, opcode: u8) -> u64 {
         let addr = if opcode == 0xE9 {
             self.rf.read_hl()
         } else {
@@ -870,7 +870,7 @@ impl Cpu {
         }
     }
 
-    fn call(&mut self, opcode: u8) -> usize {
+    fn call(&mut self, opcode: u8) -> u64 {
         let addr = self.fetch_u16();
 
         let cond = match opcode {

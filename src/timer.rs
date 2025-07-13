@@ -1,4 +1,4 @@
-const TAC_VALS: [usize; 4] = [1024, 16, 64, 256];
+const TAC_VALS: [u64; 4] = [1024, 16, 64, 256];
 
 #[derive(Debug)]
 pub struct Timer {
@@ -7,8 +7,8 @@ pub struct Timer {
     pub tma: u8,
     pub tac: u8,
     pub timer_int: bool,
-    tima_state: usize,
-    div_state: usize,
+    tima_state: u64,
+    div_state: u64,
 }
 
 impl Timer {
@@ -24,7 +24,7 @@ impl Timer {
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: u64) {
         // update div
         self.div_state += cycles;
         while self.div_state >= 256 {

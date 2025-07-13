@@ -13,7 +13,7 @@ pub struct Ppu {
     objects: [Object; 40],
     pub frame: [[Color; SCREEN_WIDTH]; SCREEN_HEIGHT],
     frame_buffer: [[Color; SCREEN_WIDTH]; SCREEN_HEIGHT],
-    cycles: usize,
+    cycles: u64,
     pub stat_int: bool,
     pub vblank_int: bool,
 
@@ -290,7 +290,7 @@ impl Ppu {
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: u64) {
         if !self.lcdc.lcd_ppu_enable() {
             self.stat.set_ppu_mode(0);
             return;

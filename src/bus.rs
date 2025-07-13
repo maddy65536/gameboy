@@ -26,7 +26,7 @@ impl Bus {
         }
     }
 
-    pub fn tick(&mut self, cycles: usize) {
+    pub fn tick(&mut self, cycles: u64) {
         self.joypad.tick();
         self.ram[0xFF0F] |= (self.joypad.joypad_int as u8) << 4;
         self.joypad.joypad_int = false;
