@@ -17,6 +17,7 @@ pub struct Joypad {
 bitfield! {
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub struct P1(pub u8): Debug, FromStorage, IntoStorage, DerefStorage {
+        pub upper_bits: u8 @ 6..=7,
         pub buttons: bool @ 5,
         pub dpad: bool @ 4,
         pub start_down: bool @ 3,
@@ -73,5 +74,7 @@ impl Joypad {
             self.p1.set_b_left(true);
             self.p1.set_a_right(true);
         }
+        // keep upper bits high
+        self.p1.set_upper_bits(0x03);
     }
 }
