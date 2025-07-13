@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 mod mbc1;
 mod mbc2;
+mod mbc3;
 mod no_mbc;
 
 pub fn create_cart(rom: Vec<u8>, ram: Option<Vec<u8>>) -> Box<dyn Mbc> {
@@ -14,6 +15,8 @@ pub fn create_cart(rom: Vec<u8>, ram: Option<Vec<u8>>) -> Box<dyn Mbc> {
         0x03 => Box::new(mbc1::Mbc1::new(rom, true)) as Box<dyn Mbc>,
         0x05 => Box::new(mbc2::Mbc2::new(rom, false)) as Box<dyn Mbc>,
         0x06 => Box::new(mbc2::Mbc2::new(rom, true)) as Box<dyn Mbc>,
+        0x11 | 0x12 => Box::new(mbc3::Mbc3::new(rom, false)) as Box<dyn Mbc>,
+        0x13 => Box::new(mbc3::Mbc3::new(rom, true)) as Box<dyn Mbc>,
         _ => panic!("unsuported MBC: {:#04x}", mbc),
     };
     if let Some(ram) = ram {
