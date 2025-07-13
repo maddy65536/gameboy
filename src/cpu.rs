@@ -1,5 +1,5 @@
 use crate::bus::Bus;
-use crate::mbc::Cart;
+use crate::mbc::Mbc;
 
 // instruction timings in T-cycles
 #[rustfmt::skip]
@@ -163,7 +163,7 @@ impl RegisterFile {
 }
 
 impl Cpu {
-    pub fn new(cart: Box<dyn Cart>) -> Self {
+    pub fn new(cart: Box<dyn Mbc>) -> Self {
         Self {
             rf: RegisterFile::default(),
             bus: Bus::new(cart),

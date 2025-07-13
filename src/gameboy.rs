@@ -1,4 +1,7 @@
-use std::fs;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     cpu::Cpu,
@@ -12,6 +15,7 @@ const CYCLES_PER_FRAME: u64 = CLOCK_SPEED / 60;
 pub struct Gameboy {
     pub cpu: Cpu,
     cycles: u64,
+    save_path: PathBuf,
 }
 
 #[derive(Debug)]
@@ -27,12 +31,18 @@ pub enum GbBtn {
 }
 
 impl Gameboy {
-    pub fn new(rom_path: String) -> Self {
+    pub fn new(rom_path: &Path) -> Self {
+        let save_path = rom_path.with_extension("sav");
         let rom: Vec<u8> = fs::read(rom_path).unwrap();
-        let cart = create_cart(rom, None);
+        let save = fs::read(&save_path).ok();
+        let cart = create_cart(rom, save);
         let mut cpu = Cpu::new(cart);
         cpu.simulate_boot();
-        Self { cpu, cycles: 0 }
+        Self {
+            cpu,
+            cycles: 0,
+            save_path,
+        }
     }
 
     pub fn run_frame(&mut self) {
@@ -58,5 +68,13 @@ impl Gameboy {
 
     pub fn get_frame(&self) -> &[[Color; SCREEN_WIDTH]; SCREEN_HEIGHT] {
         &self.cpu.bus.ppu.frame
+    }
+}
+
+impl Drop for Gameboy {
+    fn drop(&mut self) {
+        if self.cpu.bus.cart.has_battery() {
+            fs::write(&self.save_path, self.cpu.bus.cart.dump_ram()).unwrap();
+        }
     }
 }

@@ -1,6 +1,7 @@
 use clap::Parser;
 use eframe::NativeOptions;
 use eframe::egui::ViewportBuilder;
+use std::path::Path;
 
 use crate::gameboy::Gameboy;
 use crate::gui::GUI_SCALE;
@@ -25,7 +26,8 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let gb = Gameboy::new(args.rom_path);
+    let path = Path::new(&args.rom_path);
+    let gb = Gameboy::new(path);
     let native_options = NativeOptions {
         viewport: ViewportBuilder::default().with_inner_size([
             (SCREEN_WIDTH * GUI_SCALE) as f32,

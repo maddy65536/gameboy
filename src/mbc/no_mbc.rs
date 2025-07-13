@@ -1,4 +1,4 @@
-use crate::mbc::Cart;
+use crate::mbc::Mbc;
 // just a plain cartridge with no mapper and no ram for now, i'll deal with those later
 #[derive(Debug)]
 pub struct NoMbc {
@@ -11,7 +11,7 @@ impl NoMbc {
     }
 }
 
-impl Cart for NoMbc {
+impl Mbc for NoMbc {
     fn read_u8(&self, addr: u16) -> u8 {
         self.rom[addr as usize]
     }
@@ -21,7 +21,11 @@ impl Cart for NoMbc {
 
     fn load_ram(&mut self, _ram: Vec<u8>) {}
 
-    fn dump_ram(&self) -> Option<Vec<u8>> {
-        None
+    fn dump_ram(&self) -> Vec<u8> {
+        vec![]
+    }
+
+    fn has_battery(&self) -> bool {
+        false
     }
 }

@@ -1,5 +1,5 @@
 use crate::joypad::Joypad;
-use crate::mbc::Cart;
+use crate::mbc::Mbc;
 use crate::ppu::Ppu;
 use crate::serial::Serial;
 use crate::timer::Timer;
@@ -7,7 +7,7 @@ use crate::timer::Timer;
 #[derive(Debug)]
 pub struct Bus {
     pub ram: [u8; 0x10000], // just a flat array until i start the memory map stuff
-    cart: Box<dyn Cart>,
+    pub cart: Box<dyn Mbc>,
     pub timer: Timer,
     pub ppu: Ppu,
     pub joypad: Joypad,
@@ -15,7 +15,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(cart: Box<dyn Cart>) -> Self {
+    pub fn new(cart: Box<dyn Mbc>) -> Self {
         Bus {
             ram: [0; 0x10000],
             cart,
@@ -93,6 +93,7 @@ impl Bus {
             0x0000..=0x3FFF => self.cart.read_u8(addr), // cart rom bank 0
             0x4000..=0x7FFF => self.cart.read_u8(addr), // cart rom bank 01-NN
             0x8000..=0x9FFF => self.ppu.read_u8(addr),  // VRAM
+            0xA000..=0xBFFF => self.cart.read_u8(addr), // external RAM
             0xC000..=0xCFFF => self.ram_read(addr),
             0xD000..=0xDFFF => self.ram_read(addr),
             0xFE00..=0xFE9F => self.ppu.read_u8(addr), // OAM
@@ -105,7 +106,10 @@ impl Bus {
 
     pub fn write_u8(&mut self, addr: u16, val: u8) {
         match addr {
-            0x8000..=0x9FFF => self.ppu.write_u8(addr, val), // VRAM
+            0x0000..=0x3FFF => self.cart.write_u8(addr, val), // cart rom bank 0
+            0x4000..=0x7FFF => self.cart.write_u8(addr, val), // cart rom bank 01-NN
+            0x8000..=0x9FFF => self.ppu.write_u8(addr, val),  // VRAM
+            0xA000..=0xBFFF => self.cart.write_u8(addr, val), // external RAM
             0xC000..=0xCFFF => self.ram_write(addr, val),
             0xD000..=0xDFFF => self.ram_write(addr, val),
             0xFE00..=0xFE9F => self.ppu.write_u8(addr, val), // OAM
