@@ -3,8 +3,8 @@
 ok gameboy emulator
 
 ## controls
-- A: Z key
-- B: X key
+- A: X key
+- B: Z key
 - select: A key
 - start: S key
 - dpad: arrow keys

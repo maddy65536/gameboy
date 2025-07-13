@@ -387,7 +387,7 @@ impl Ppu {
     fn draw_bg(&mut self) {
         let scroll_x = self.scx;
         let scroll_y = self.scy;
-        let win_x = self.wx.wrapping_sub(7);
+        let win_x = (self.wx as i16) - 7;
         let win_y = self.wy;
 
         let tileset = self.lcdc.bg_window_tiles();
@@ -398,15 +398,15 @@ impl Ppu {
         let mut pixel;
         let mut window_rendered = false;
 
-        for line_x in 0..160 {
+        for line_x in 0u8..160u8 {
             let x;
             let y;
             let tilemap;
 
-            if use_window && (line_x >= win_x) {
+            if use_window && ((line_x as i16) >= win_x) {
                 // render window
                 window_rendered = true;
-                x = line_x - win_x;
+                x = ((line_x as i16) - win_x) as u8;
                 y = self.wly;
                 tilemap = win_tilemap;
             } else {

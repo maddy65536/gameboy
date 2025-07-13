@@ -54,8 +54,8 @@ impl Gui {
             self.gb.set_button(crate::gameboy::GbBtn::Down,   i.key_down(egui::Key::ArrowDown));
             self.gb.set_button(crate::gameboy::GbBtn::Left,   i.key_down(egui::Key::ArrowLeft));
             self.gb.set_button(crate::gameboy::GbBtn::Right,  i.key_down(egui::Key::ArrowRight));
-            self.gb.set_button(crate::gameboy::GbBtn::A,      i.key_down(egui::Key::Z));
-            self.gb.set_button(crate::gameboy::GbBtn::B,      i.key_down(egui::Key::X));
+            self.gb.set_button(crate::gameboy::GbBtn::A,      i.key_down(egui::Key::X));
+            self.gb.set_button(crate::gameboy::GbBtn::B,      i.key_down(egui::Key::Z));
             self.gb.set_button(crate::gameboy::GbBtn::Select, i.key_down(egui::Key::A));
             self.gb.set_button(crate::gameboy::GbBtn::Start,  i.key_down(egui::Key::S));
         })
