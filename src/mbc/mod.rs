@@ -1,7 +1,8 @@
 use std::fmt::Debug;
 
-pub mod mbc1;
-pub mod no_mbc;
+mod mbc1;
+mod mbc2;
+mod no_mbc;
 
 pub fn create_cart(rom: Vec<u8>, ram: Option<Vec<u8>>) -> Box<dyn Mbc> {
     // get cartridge header info
@@ -11,6 +12,8 @@ pub fn create_cart(rom: Vec<u8>, ram: Option<Vec<u8>>) -> Box<dyn Mbc> {
         0x00 => Box::new(no_mbc::NoMbc::new(rom)) as Box<dyn Mbc>,
         0x01 | 0x02 => Box::new(mbc1::Mbc1::new(rom, false)) as Box<dyn Mbc>,
         0x03 => Box::new(mbc1::Mbc1::new(rom, true)) as Box<dyn Mbc>,
+        0x05 => Box::new(mbc2::Mbc2::new(rom, false)) as Box<dyn Mbc>,
+        0x06 => Box::new(mbc2::Mbc2::new(rom, true)) as Box<dyn Mbc>,
         _ => panic!("unsuported MBC: {:#04x}", mbc),
     };
     if let Some(ram) = ram {

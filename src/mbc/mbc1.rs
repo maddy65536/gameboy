@@ -17,7 +17,6 @@ impl Mbc1 {
     pub fn new(rom: Vec<u8>, has_battery: bool) -> Self {
         let ram_size = ram_size(&rom);
         let rom_size = rom_size(&rom);
-        println!("ram size: {}\nrom size: {}", ram_size, rom_size);
         Self {
             rom,
             ram: std::iter::repeat_n(0, ram_size).collect(),
