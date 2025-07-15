@@ -53,7 +53,7 @@ impl Joypad {
 
     pub fn tick(&mut self) {
         if !self.p1.buttons() {
-            if !self.start || !self.select || !self.b || !self.a {
+            if self.start || self.select || self.b || self.a {
                 self.joypad_int = true;
             }
             self.p1.set_start_down(!self.start);
@@ -61,7 +61,7 @@ impl Joypad {
             self.p1.set_b_left(!self.b);
             self.p1.set_a_right(!self.a);
         } else if !self.p1.dpad() {
-            if !self.down || !self.up || !self.left || !self.right {
+            if self.down || self.up || self.left || self.right {
                 self.joypad_int = true;
             }
             self.p1.set_start_down(!self.down);
