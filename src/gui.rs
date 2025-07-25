@@ -81,7 +81,11 @@ impl eframe::App for Gui {
         });
 
         let frame_time = now.elapsed();
-        ctx.request_repaint_after(frame_goal - frame_time);
+        if frame_time > frame_goal {
+            ctx.request_repaint();
+        } else {
+            ctx.request_repaint_after(frame_goal - frame_time);
+        }
         // ctx.request_repaint_after(Duration::from_millis(17));
     }
 }

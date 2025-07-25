@@ -55,7 +55,7 @@ impl Timer {
             0xFF05 => self.tima,
             0xFF06 => self.tma,
             0xFF07 => self.tac,
-            _ => unreachable!(),
+            _ => panic!("invalid read from timer at address {:#06x}", addr),
         }
     }
 
@@ -65,7 +65,7 @@ impl Timer {
             0xFF05 => self.tima = val,
             0xFF06 => self.tma = val,
             0xFF07 => self.tac = val,
-            _ => unreachable!(),
+            _ => panic!("invalid write to timer at address {:#06x}", addr),
         }
     }
 

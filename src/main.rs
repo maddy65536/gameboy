@@ -8,6 +8,7 @@ use crate::gui::GUI_SCALE;
 use crate::gui::Gui;
 use crate::ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
+mod apu;
 mod bus;
 mod cpu;
 mod gameboy;

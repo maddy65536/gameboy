@@ -1,10 +1,10 @@
+use crate::apu::Apu;
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::ppu::Ppu;
 use crate::serial::Serial;
 use crate::timer::Timer;
 
-#[derive(Debug)]
 pub struct Bus {
     pub ram: [u8; 0x10000], // just a flat array until i start the memory map stuff
     pub cart: Box<dyn Mbc>,
@@ -12,6 +12,7 @@ pub struct Bus {
     pub ppu: Ppu,
     pub joypad: Joypad,
     serial: Serial,
+    apu: Apu,
 }
 
 impl Bus {
@@ -23,6 +24,7 @@ impl Bus {
             ppu: Ppu::new(),
             joypad: Joypad::new(),
             serial: Serial::new(),
+            apu: Apu::new(),
         }
     }
 
@@ -44,6 +46,8 @@ impl Bus {
         self.ppu.stat_int = false;
         self.ram[0xFF0F] |= self.ppu.vblank_int as u8;
         self.ppu.vblank_int = false;
+
+        self.apu.tick(cycles, self.timer.div);
     }
 
     fn ram_read(&self, addr: u16) -> u8 {
@@ -178,6 +182,8 @@ impl Bus {
             0xFF00 => self.joypad.read_u8(),              // joypad
             0xFF01 | 0xFF02 => self.serial.read_u8(addr), // serial data
             0xFF04..=0xFF07 => self.timer.read_u8(addr),
+            0xFF10..=0xFF26 => self.apu.read_u8(addr),
+            0xFF30..=0xFF3F => self.apu.read_u8(addr),
             0xFF46 => 0, // what does reading from the dma register do?
             0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.read_u8(addr),
             0xFF0F => self.ram_read(addr), // IF
@@ -190,6 +196,8 @@ impl Bus {
             0xFF00 => self.joypad.write_u8(val),                // joypad
             0xFF01 | 0xFF02 => self.serial.write_u8(addr, val), // serial data
             0xFF04..=0xFF07 => self.timer.write_u8(addr, val),
+            0xFF10..=0xFF26 => self.apu.write_u8(addr, val),
+            0xFF30..=0xFF3F => self.apu.write_u8(addr, val),
             0xFF46 => self.do_dma(val), // dma lives in the bus to make things easier
             0xFF40..0xFF46 | 0xFF47..=0xFF4B => self.ppu.write_u8(addr, val),
             0xFF0F => self.ram_write(addr, val), // IF

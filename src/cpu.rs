@@ -67,7 +67,6 @@ const CB_INSTRUCTION_TIMINGS: [u64; 256] = [
     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8,  16, 8,  // 0xF0
 ];
 
-#[derive(Debug)]
 pub struct Cpu {
     rf: RegisterFile,
     pub bus: Bus,
