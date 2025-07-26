@@ -66,13 +66,15 @@ impl Bus {
             0xA000..=0xBFFF => self.cart.read_u8(addr), // external RAM
             0xC000..=0xCFFF => self.ram_read(addr),
             0xD000..=0xDFFF => self.ram_read(addr),
-            // 0xE000..=0xFDFF => unimplemented!("tried to read echo ram"),
-            0xFE00..=0xFE9F => self.ppu.read_u8(addr), // OAM
-            // 0xFEA0..=0xFEFF => unimplemented!("tried to read FORBIDDEN MEMORY"),
+            0xE000..=0xFDFF => self.ram_read(addr - 2000), // echo RAM
+            0xFE00..=0xFE9F => self.ppu.read_u8(addr),     // OAM
+            0xFEA0..=0xFEFF => {
+                println!("WARNING: read from prohibited address {:#06x}", addr);
+                self.ram_read(addr)
+            }
             0xFF00..=0xFF7F => self.io_read_u8(addr), // IO
             0xFF80..=0xFFFE => self.ram_read(addr),   // HRAM
             0xFFFF => self.ram_read(addr),            // IE
-            _ => self.ram_read(addr),
         }
     }
 
@@ -84,13 +86,15 @@ impl Bus {
             0xA000..=0xBFFF => self.cart.write_u8(addr, val), // external RAM
             0xC000..=0xCFFF => self.ram_write(addr, val),
             0xD000..=0xDFFF => self.ram_write(addr, val),
-            // 0xE000..=0xFDFF => unimplemented!("tried to write to echo ram"),
-            0xFE00..=0xFE9F => self.ppu.write_u8(addr, val), // OAM
-            // 0xFEA0..=0xFEFF => unimplemented!("tried to write to FORBIDDEN MEMORY"),
+            0xE000..=0xFDFF => self.ram_write(addr - 2000, val), // echo RAM
+            0xFE00..=0xFE9F => self.ppu.write_u8(addr, val),     // OAM
+            0xFEA0..=0xFEFF => {
+                println!("WARNING: write to prohibited address {:#06x}", addr);
+                self.ram_write(addr, val);
+            }
             0xFF00..=0xFF7F => self.io_write_u8(addr, val), // IO
             0xFF80..=0xFFFE => self.ram_write(addr, val),   // HRAM
             0xFFFF => self.ram_write(addr, val),            // IE
-            _ => self.ram_write(addr, val),
         }
     }
 
