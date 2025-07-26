@@ -66,7 +66,7 @@ impl Bus {
             0xA000..=0xBFFF => self.cart.read_u8(addr), // external RAM
             0xC000..=0xCFFF => self.ram_read(addr),     // WRAM
             0xD000..=0xDFFF => self.ram_read(addr),     // WRAM (switchable bank on CGB)
-            0xE000..=0xFDFF => self.ram_read(addr - 2000), // echo RAM
+            0xE000..=0xFDFF => self.ram_read(addr - 0x2000), // echo RAM
             0xFE00..=0xFE9F => self.ppu.read_u8(addr),  // OAM
             0xFEA0..=0xFEFF => {
                 println!("WARNING: read from prohibited address {:#06x}", addr);
@@ -86,7 +86,7 @@ impl Bus {
             0xA000..=0xBFFF => self.cart.write_u8(addr, val), // external RAM
             0xC000..=0xCFFF => self.ram_write(addr, val),     // WRAM
             0xD000..=0xDFFF => self.ram_write(addr, val),     // WRAM (switchable bank on CGB)
-            0xE000..=0xFDFF => self.ram_write(addr - 2000, val), // echo RAM
+            0xE000..=0xFDFF => self.ram_write(addr - 0x2000, val), // echo RAM
             0xFE00..=0xFE9F => self.ppu.write_u8(addr, val),  // OAM
             0xFEA0..=0xFEFF => {
                 println!("WARNING: write to prohibited address {:#06x}", addr);
