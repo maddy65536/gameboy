@@ -46,7 +46,7 @@ impl Mbc1 {
                 }
                 bank
             }
-            _ => panic!("invalid read from MBC1 rom at address {:#06x}", addr),
+            _ => panic!("invalid read from MBC1 rom at address {addr:#06x}"),
         };
         self.rom[(bank << 14) | ((addr & 0x3FFF) as usize)]
     }
@@ -81,7 +81,7 @@ impl Mbc for Mbc1 {
         match addr {
             0x0000..=0x7FFF => self.read_rom(addr),
             0xA000..=0xBFFF => self.read_ram(addr),
-            _ => panic!("invalid read from MBC1 at address {:#06x}", addr),
+            _ => panic!("invalid read from MBC1 at address {addr:#06x}"),
         }
     }
 
@@ -92,7 +92,7 @@ impl Mbc for Mbc1 {
             0x4000..=0x5FFF => self.ram_bank = (val & 0x03) as usize,
             0x6000..=0x7FFF => self.mode = (val & 1) != 0,
             0xA000..=0xBFFF => self.write_ram(addr, val),
-            _ => panic!("invalid write to MBC1 at address {:#06x}", addr),
+            _ => panic!("invalid write to MBC1 at address {addr:#06x}"),
         }
     }
 

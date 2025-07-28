@@ -219,7 +219,7 @@ impl Cpu {
                     2 => 0x0050, // Timer
                     3 => 0x0058, // Serial
                     4 => 0x0060, // Joypad
-                    _ => panic!("invalid interrupt??: {}", int),
+                    _ => panic!("invalid interrupt??: {int}"),
                 };
 
                 self.ime = false;
@@ -265,7 +265,7 @@ impl Cpu {
             5 => self.rf.l = val,
             6 => self.write_hl_ind(val),
             7 => self.rf.a = val,
-            _ => panic!("tried to write to register {}?", reg),
+            _ => panic!("tried to write to register {reg}?"),
         }
     }
 
@@ -279,7 +279,7 @@ impl Cpu {
             5 => self.rf.l,
             6 => self.read_hl_ind(),
             7 => self.rf.a,
-            _ => panic!("tried to read from register {}?", reg),
+            _ => panic!("tried to read from register {reg}?"),
         }
     }
 
@@ -406,7 +406,7 @@ impl Cpu {
             0x11 => self.rf.write_de(imm),
             0x21 => self.rf.write_hl(imm),
             0x31 => self.rf.sp = imm,
-            _ => panic!("invalid opcode {:#04X} in ld_r16_imm", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in ld_r16_imm"),
         }
     }
 
@@ -438,7 +438,7 @@ impl Cpu {
                 self.rf.a = self.read_hl_ind();
                 self.rf.write_hl(self.rf.read_hl() - 1);
             }
-            _ => panic!("invalid opcode {:#04X} in ld_ind_a", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in ld_ind_a"),
         }
     }
 
@@ -464,7 +464,7 @@ impl Cpu {
             0xD1 => self.rf.write_de(val),
             0xE1 => self.rf.write_hl(val),
             0xF1 => self.rf.write_af(val),
-            _ => panic!("invalid opcode {:#04X} in pop", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in pop"),
         }
     }
 
@@ -474,7 +474,7 @@ impl Cpu {
             0xD5 => self.push_u16(self.rf.read_de()),
             0xE5 => self.push_u16(self.rf.read_hl()),
             0xF5 => self.push_u16(self.rf.read_af()),
-            _ => panic!("invalid opcode {:#04X} in push", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in push"),
         }
     }
 
@@ -501,7 +501,7 @@ impl Cpu {
             0xF0 => self.rf.a = self.bus.read_u8(0xFF00 + offset),
             0xE2 => self.bus.write_u8(0xFF00 + offset, self.rf.a),
             0xF2 => self.rf.a = self.bus.read_u8(0xFF00 + offset),
-            _ => panic!("invalid opcode {:#04X} in la_a_ind_offset", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in la_a_ind_offset"),
         }
     }
 
@@ -510,7 +510,7 @@ impl Cpu {
         match opcode {
             0xEA => self.bus.write_u8(addr, self.rf.a),
             0xFA => self.rf.a = self.bus.read_u8(addr),
-            _ => panic!("invalid opcode {:#04X} in la_a_ind", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in la_a_ind"),
         }
     }
 
@@ -561,7 +561,7 @@ impl Cpu {
             0x13 => self.rf.write_de(self.rf.read_de().wrapping_add(1)),
             0x23 => self.rf.write_hl(self.rf.read_hl().wrapping_add(1)),
             0x33 => self.rf.sp = self.rf.sp.wrapping_add(1),
-            _ => panic!("invalid opcode {:#04X} in inc16", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in inc16"),
         }
     }
 
@@ -583,7 +583,7 @@ impl Cpu {
             0x1B => self.rf.write_de(self.rf.read_de().wrapping_sub(1)),
             0x2B => self.rf.write_hl(self.rf.read_hl().wrapping_sub(1)),
             0x3B => self.rf.sp = self.rf.sp.wrapping_sub(1),
-            _ => panic!("invalid opcode {:#04X} in dec16", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in dec16"),
         }
     }
 
@@ -606,7 +606,7 @@ impl Cpu {
             0x19 => self.rf.read_de(),
             0x29 => self.rf.read_hl(),
             0x39 => self.rf.sp,
-            _ => panic!("invalid opcode {:#04X} in add16", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in add16"),
         };
 
         let res = a.wrapping_add(b);
@@ -812,7 +812,7 @@ impl Cpu {
             0x38 => self.rf.read_c(),
             0x20 => !self.rf.read_z(),
             0x30 => !self.rf.read_c(),
-            _ => panic!("invalid opcode {:#04X} in jr", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in jr"),
         };
         if cond {
             self.rf.pc = self.rf.pc.wrapping_add_signed(offset as i16);
@@ -833,7 +833,7 @@ impl Cpu {
                 self.ime = true;
                 true
             }
-            _ => panic!("invalid opcode {:#04X} in ret", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in ret"),
         };
 
         if cond {
@@ -858,7 +858,7 @@ impl Cpu {
             0xDA => self.rf.read_c(),
             0xC3 => true,
             0xE9 => true,
-            _ => panic!("invalid opcode {:#04X} in jp", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in jp"),
         };
 
         if cond {
@@ -878,7 +878,7 @@ impl Cpu {
             0xCC => self.rf.read_z(),
             0xDC => self.rf.read_c(),
             0xCD => true,
-            _ => panic!("invalid opcode {:#04X} in call", opcode),
+            _ => panic!("invalid opcode {opcode:#04X} in call"),
         };
 
         if cond {

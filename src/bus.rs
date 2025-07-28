@@ -69,7 +69,7 @@ impl Bus {
             0xE000..=0xFDFF => self.ram_read(addr - 0x2000), // echo RAM
             0xFE00..=0xFE9F => self.ppu.read_u8(addr),  // OAM
             0xFEA0..=0xFEFF => {
-                println!("WARNING: read from prohibited address {:#06x}", addr);
+                println!("WARNING: read from prohibited address {addr:#06x}");
                 self.ram_read(addr)
             }
             0xFF00..=0xFF7F => self.io_read_u8(addr), // IO
@@ -89,7 +89,7 @@ impl Bus {
             0xE000..=0xFDFF => self.ram_write(addr - 0x2000, val), // echo RAM
             0xFE00..=0xFE9F => self.ppu.write_u8(addr, val),  // OAM
             0xFEA0..=0xFEFF => {
-                println!("WARNING: write to prohibited address {:#06x}", addr);
+                println!("WARNING: write to prohibited address {addr:#06x}");
                 self.ram_write(addr, val);
             }
             0xFF00..=0xFF7F => self.io_write_u8(addr, val), // IO

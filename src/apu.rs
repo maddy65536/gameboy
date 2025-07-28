@@ -87,7 +87,7 @@ impl Apu {
             0xFF25 => self.nr51,
             0xFF26 => self.nr52,
             0xFF30..=0xFF3F => self.wave_ram[(addr as usize) - 0xFF30],
-            _ => panic!("invalid read from APU at address {:#06x}", addr),
+            _ => panic!("invalid read from APU at address {addr:#06x}"),
         }
     }
 
@@ -116,7 +116,7 @@ impl Apu {
             0xFF25 => self.nr51 = val,
             0xFF26 => self.nr52 = (val & 0x80) | (self.nr52 & !0x80), // don't set read only
             0xFF30..=0xFF3F => self.wave_ram[(addr as usize) - 0xFF30] = val,
-            _ => panic!("invalid write to APU at address {:#06x}", addr),
+            _ => panic!("invalid write to APU at address {addr:#06x}"),
         }
     }
 

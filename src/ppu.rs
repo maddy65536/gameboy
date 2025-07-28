@@ -174,7 +174,7 @@ impl Ppu {
             0xFF49 => self.obp1,
             0xFF4A => self.wy,
             0xFF4B => self.wx,
-            _ => panic!("invalid read from PPU at address {:#06x}", addr),
+            _ => panic!("invalid read from PPU at address {addr:#06x}"),
         }
     }
 
@@ -193,7 +193,7 @@ impl Ppu {
             0xFF49 => self.obp1 = val,
             0xFF4A => self.wy = val,
             0xFF4B => self.wx = val,
-            _ => panic!("invalid write to PPU at address {:#06x}", addr),
+            _ => panic!("invalid write to PPU at address {addr:#06x}"),
         }
     }
 

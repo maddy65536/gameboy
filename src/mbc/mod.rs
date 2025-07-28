@@ -17,7 +17,7 @@ pub fn create_cart(rom: Vec<u8>, ram: Option<Vec<u8>>) -> Box<dyn Mbc> {
         0x06 => Box::new(mbc2::Mbc2::new(rom, true)) as Box<dyn Mbc>,
         0x11 | 0x12 => Box::new(mbc3::Mbc3::new(rom, false)) as Box<dyn Mbc>,
         0x13 => Box::new(mbc3::Mbc3::new(rom, true)) as Box<dyn Mbc>,
-        _ => panic!("unsuported MBC: {:#04x}", mbc),
+        _ => panic!("unsuported MBC: {mbc:#04x}"),
     };
     if let Some(ram) = ram {
         cart.load_ram(ram);
