@@ -2,6 +2,11 @@
 
 ok gameboy emulator
 
+## usage
+```
+./gameboy [rom-path]
+```
+
 ## controls
 - A: X key
 - B: Z key
